@@ -7,16 +7,16 @@ import optuna
 import csv
 import random
 
-from protein_wang.pyHGT.regression_test import GraphRegressor
-from protein_wang.pyHGT.utils import load_graphpred_dataset, load_graphpred_testDataset
+from HGRIFN.HG_RIFN_reg import GraphRegressor
+from HGRIFN.utils import load_graphpred_dataset, load_graphpred_testDataset
 
 
 def objective(trial):
     """
-    使用optuna优化模型参数
+    Use Optuna to optimize model parameters
     """
-    # 定于超参数搜索空间
-    print('Version: 0.0.3_HG-RIFN_regression')
+    # Defined in the hyperparameter search space
+    print('Version: HG-RIFN_regression')
     dataset = trial.suggest_categorical('dataset', ['train_autoencoder'])
     model_name = trial.suggest_categorical('model_name', [f'graphs_with_regression_{dataset}_skip_batch'])
     input = trial.suggest_categorical('input', [args.input])
