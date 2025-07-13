@@ -1,11 +1,9 @@
 import os
 import argparse
 import logging
-import numpy as np
 import torch
 import optuna
 import csv
-import random
 
 from HGRIFN.HG_RIFN_reg import GraphRegressor
 from HGRIFN.utils import load_graphpred_dataset, load_graphpred_testDataset
@@ -15,26 +13,23 @@ def objective(trial):
     """
     Use Optuna to optimize model parameters
     """
-    # Defined in the hyperparameter search space
-    print('Version: HG-RIFN_regression')
-    dataset = trial.suggest_categorical('dataset', ['train_autoencoder'])
-    model_name = trial.suggest_categorical('model_name', [f'graphs_with_regression_{dataset}_skip_batch'])
-    input = trial.suggest_categorical('input', [args.input])
 
-    gnn = trial.suggest_categorical('gnn', ['gin'])  # 'gin', 'gcn', 'gat', 'hgt'
-    num_gnn_layer = trial.suggest_int('num_gnn_layer', 2, 2)  # trial.suggest_int('num_gnn_layer', 2, 5)
-    num_coders_layers = trial.suggest_int('num_coders_layers', 3, 5)
-    # 先定义一个较大的范围以便 trial 进行选择
-    embed_dim = trial.suggest_categorical('embed_dim_base', [512])  # trial.suggest_int('embed_dim_base', 64, 128)
-    dim_a = trial.suggest_categorical('dim_a', [128])
+    print('Version: HG-RIFN_regression')
+    data = args.data
+    model_name = f'regression_{data}'
+    # Defined in the hyperparameter search space
+    num_gcn_layer = trial.suggest_int('num_gcn_layer', 2, 5)
+    num_coders_layers = trial.suggest_int('num_coders_layers', 2, 5)
+    embed_dim = trial.suggest_categorical('embed_dim_base', [256, 512, 768])
+    dim_a = trial.suggest_categorical('dim_a', [8, 12, 16])
     dropout = trial.suggest_float('dropout', 0.15, 0.30)
-    activation = trial.suggest_categorical('activation', ['gelu'])  # 'relu', 'elu', 'gelu', 'selu'
-    batch_size = 24  # trial.suggest_categorical('batch_size', [64, 72, 81])
+    activation = trial.suggest_categorical('activation', ['relu', 'elu', 'gelu', 'selu', 'softmax'])
+    batch_size = trial.suggest_int('batch_size', [64, 128])
     epochs = 1000
     loss_delta = trial.suggest_float('loss_delta', 10, 30)
     lr = trial.suggest_float('lr', 1e-4, 1e-3, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-4, log=True)
-    accum_steps = 1
+    accum_steps = trial.suggest_int('accum_steps', 1, 5)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     out_model_dir = f'{args.input}/{model_name}_LR{lr}'
@@ -43,10 +38,9 @@ def objective(trial):
     Lambda1 = 1
     Lambda2 = 2 - Lambda1
 
-    # 输出所有参数定义值
+    # Output all parameter definition values
     print("Parameters:")
-    print("     gnn:", gnn)
-    print("     num_gnn_layer:", num_gnn_layer)
+    print("     num_gcn_layer:", num_gcn_layer)
     print("     num_coders_layers:", num_coders_layers)
     print("     embed_dim:", embed_dim)
     print("     dim_a:", dim_a)
@@ -61,8 +55,8 @@ def objective(trial):
     print("     Lambda1:", Lambda1)
     print("     Lambda2:", Lambda2)
 
-    log_path = f'./logs/{dataset}/{model_name}'
-    log_fname = f'{log_path}/log_{gnn}_protein_wang_last.out'
+    log_path = f'./logs/{model_name}'
+    log_fname = f'{log_path}/log_HG-RIFN.out'
     os.makedirs(log_path, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
@@ -86,17 +80,9 @@ def objective(trial):
          feat_dim,
          relations) = load_graphpred_dataset(args.input, CV_FOLDS, cv_select=cv_fold, bidirected=args.bidirected)
 
-        model = GraphRegressor(
-            gnn_type=gnn,
-            num_gnn_layers=num_gnn_layer,
-            num_coder_layers=num_coders_layers,
-            relations=relations,
-            feat_dim=feat_dim,
-            embed_dim=embed_dim,
-            dim_a=dim_a,
-            dropout=dropout,
-            activation=activation
-        )
+        model = GraphRegressor(num_gnn_layers=num_gcn_layer, num_coder_layers=num_coders_layers, relations=relations,
+                               feat_dim=feat_dim, embed_dim=embed_dim, dim_a=dim_a, dropout=dropout,
+                               activation=activation)
 
         train_loss, valid_loss, valid_r2, valid_mae, valid_pcc = model.train_model(
             train_dataset,
@@ -144,7 +130,7 @@ def objective(trial):
             model_load=out_model_dir, Is_Best_test=True
         )
 
-        # 将结果和超参数写入CSV文件
+        # Write the results and hyperparameters to a CSV file.
         with open(log_fname, 'a') as f:
             f.write(
                 '\n'.join(
@@ -162,14 +148,14 @@ def objective(trial):
                 )
             )
 
-        # 测试集K-top
-        output_dir = f'D:/program/GitHub/protein_wang/Graph_top_k'
+        # Test set K-top
+        output_dir = f'{args.results}/{data}/Graph_top_k'
         os.makedirs(output_dir, exist_ok=True)
         for name, nodes, relations, weights in zip(name_protein, t_top_k_nodes, t_top_k_relations,
                                                    top_k_attention_weights):
             if name[-1] == '\x00':
                 name = name[:-4]
-            output_csv = os.path.join(output_dir, f'graph_{name}_nodes_relations.csv')
+            output_csv = os.path.join(output_dir, f'protein_{name}_nodes_relations.csv')
             with open(output_csv, 'w', newline='') as csvfile:
                 csvwriter = csv.writer(csvfile)
                 csvwriter.writerow(
@@ -178,10 +164,10 @@ def objective(trial):
                 for node, relation, weight in zip(nodes, relations, weights):
                     csvwriter.writerow([node] + relation + [weight])
 
-        csv_file = f'fold_optuna_results_{gnn}_with_skip.csv'
-        os.makedirs(args.model_dir, exist_ok=True)
+        csv_file = f'{data}/fold_optuna_results_regression.csv'
+        os.makedirs(args.results, exist_ok=True)
         csv_file = os.path.join(args.model_dir, csv_file)
-        fieldnames = ['Fold', 'model_name', 'data_dir', 'dataset', 'gnn', 'num_gnn_layer', 'embed_dim', 'dim_a',
+        fieldnames = ['Fold', 'model_name', 'data_dir', 'dataset', 'gnn', 'num_gcn_layer', 'embed_dim', 'dim_a',
                       'dropout', 'activation', 'batch_size', 'epochs', 'lr', 'weight_decay', 'accum_steps',
                       'Best_Valid_Loss(MSE)', 'Valid_R2', 'Valid_MAE', 'Valid_PCC', 'Test_Loss(MSE)', 'Test_R2',
                       'Test_MAE', 'Test_PCC']
@@ -195,9 +181,7 @@ def objective(trial):
                 'Fold': cv_fold,
                 'model_name': model_name,
                 'data_dir': args.input,
-                'dataset': dataset,
-                'gnn': gnn,
-                'num_gnn_layer': num_gnn_layer,
+                'num_gcn_layer': num_gcn_layer,
                 'embed_dim': embed_dim,
                 'dim_a': dim_a,
                 'dropout': dropout,
@@ -216,7 +200,6 @@ def objective(trial):
                 'Test_MAE': t_mae,
                 'Test_PCC': t_pcc,
             })
-        break
 
     return best_valid_loss
 
@@ -224,65 +207,17 @@ def objective(trial):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--model_name', type=str, default='graphs_with_labels',
-                        help='Name to save the trained model.')
-    parser.add_argument('--input', type=str, default='D:/program/GitHub/protein_wang/data/output_Fold_regression',
+    parser.add_argument('--input', type=str, default='./data/HGEProTstab',
                         help='The address of preprocessed graph.')
-    parser.add_argument('--dataset', type=str, default='/real')
-    parser.add_argument('--model_dir', type=str, default='./model_save',
-                        help='The address for storing the models and optimization results.')
-    parser.add_argument('--gnn', type=str, default='gcn',
-                        help='GNN layer to use with muxGNN. "gcn", "gat", "hgt", or "gin". Default is "gin".')
-    parser.add_argument('--num_gnn_layer', type=int, default=1,
-                        help='Number of GNN layers in the embedding module.')
-    parser.add_argument('--pos_class_weight', type=float, default=1.,
-                        help='Additional weight to apply to loss contribution of positive class.')
-    parser.add_argument('--embed_dim', type=int, default=64,
-                        help='Size of output embedding dimension.')
-    parser.add_argument('--dim_a', type=int, default=16,
-                        help='Dimension of attention.')
-    parser.add_argument('--dropout', type=float, default=0.2,
-                        help='Dropout rate during training.')
-    parser.add_argument('--activation', type=str, default='elu',
-                        help='Activation function. Options are "relu", "elu", or "gelu".')
-    parser.add_argument('--batch_size', type=int, default=1,
-                        help='Batch size during training and inference.')
-    parser.add_argument('--epochs', type=int, default=10,
-                        help='Maximum limit on training epochs.')
-    parser.add_argument('--lr', type=float, default=1e-3,
-                        help='Learning rate for optimizer.')
-    parser.add_argument('--weight_decay', type=float, default=0.01,
-                        help='L2 regularization penalty.')
-    parser.add_argument('--accum_steps', type=int, default=4,
-                        help='Number of gradient accumulation steps to take before weight update.')
-    parser.add_argument('--num_workers', type=int, default=0,
-                        help='Number of worker processes.')
-    parser.add_argument('--bidirected', action='store_true', default=False,
-                        help='Use a bidirectional version of the input graphs.')
-    parser.add_argument('--n_trials', type=int, default=10,
+    parser.add_argument('--results', type=str, default='./results',)
+    parser.add_argument('--data', type=str, default='HGEProTstab')
+    parser.add_argument('--n_trials', type=int, default=20,
                         help='Number of trial runs.')
 
     args = parser.parse_args()
 
-    # study = optuna.create_study(
-    #     storage='sqlite:///test_ProTstable2_norm_autoencoder9.19.sqlite3',
-    #     study_name='muxGCN_skip',
-    #     pruner=optuna.pruners.MedianPruner(
-    #         n_startup_trials=0,  # 在进行前X次试验时不会进行剪枝
-    #         n_warmup_steps=10  # 在每次试验的前X个步骤中不会进行剪枝
-    #     ),
-    #     direction='minimize'
-    # )
-    # study = optuna.study.load_study('muxGCN_skip', 'sqlite:///ProTstable2_norm_hessian9.9.sqlite3')
-    # study = optuna.study.load_study('Fold10+1', 'sqlite:///db_7.4GCN.sqlite3')
-
-    # 启动优化过程
-    # study.optimize(objective, n_trials=args.n_trials)
-
     study = optuna.create_study(direction='minimize')
     study.optimize(objective, n_trials=args.n_trials)
-    #
-    # joblib.dump(study, 'study.pkl')
 
     print(f'Best trial: {study.best_trial.value}')
     print('Best hyperparameters: ', study.best_trial.params)

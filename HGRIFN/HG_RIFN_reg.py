@@ -10,11 +10,10 @@ import seaborn as sns
 
 from time import time
 from dgl.dataloading import GraphDataLoader
-from dgl.nn.pytorch import GATConv, GINConv, GraphConv, HGTConv, SAGEConv, GlobalAttentionPooling
+from dgl.nn.pytorch import GraphConv, GlobalAttentionPooling
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from protein.pyHGT.conv import HGTConv as HGT
 from sklearn.metrics import r2_score, mean_absolute_error
 import matplotlib.pyplot as plt
 
@@ -22,7 +21,6 @@ import matplotlib.pyplot as plt
 class GraphRegressor(nn.Module):
     def __init__(
             self,
-            gnn_type,
             num_gnn_layers,
             num_coder_layers,
             relations,
@@ -33,7 +31,6 @@ class GraphRegressor(nn.Module):
             activation=None
     ):
         super(GraphRegressor, self).__init__()
-        self.gnn_type = gnn_type
         self.num_gnn_layers = num_gnn_layers
         self.num_coder_layers = num_coder_layers
         self.relations = relations
@@ -49,15 +46,9 @@ class GraphRegressor(nn.Module):
         self.autoEncoder = AutoEncoder(num_layers=self.num_coder_layers, feat_dim=self.feat_dim,
                                        embed_dim=self.embed_dim, activation=self.activation)
 
-        self.embedder = MuxGNNGraph(
-            gnn_type=self.gnn_type,
-            num_gnn_layers=self.num_gnn_layers,
-            relations=self.relations,
-            embed_dim=self.embed_dim,
-            dim_a=self.dim_a,
-            dropout=self.dropout,
-            activation=self.activation,
-        )
+        self.embedder = MuxGNNGraph(num_gnn_layers=self.num_gnn_layers, relations=self.relations,
+                                    embed_dim=self.embed_dim, dim_a=self.dim_a, dropout=self.dropout,
+                                    activation=self.activation)
 
         self.regressor = Regressor(self.dim_a, self.activation, top_k=20)
 
@@ -108,8 +99,7 @@ class GraphRegressor(nn.Module):
         best_loss = float('inf')
         Valid_MSE = 0.
         pcc = 0.
-        best_loss_stop = float('inf')
-        step_pcc_early_stop = 30  # 早停器
+        step_pcc_early_stop = 30
         pcc_early_stop = step_pcc_early_stop
         HuberLoss = nn.HuberLoss(reduction='mean', delta=loss_delta)
         # mseLoss = nn.MSELoss(reduction='mean')
@@ -147,7 +137,6 @@ class GraphRegressor(nn.Module):
                 if ((i + 1) % accum_steps == 0) or ((i + 1) == len(data_iter)):
                     optimizer.step()
                     optimizer.zero_grad()
-                    # test the model, to plus 'break'
 
             train_loss = avg_loss / len(data_iter)
 
@@ -180,11 +169,6 @@ class GraphRegressor(nn.Module):
                 pcc_early_stop = step_pcc_early_stop
             else:
                 pcc_early_stop -= 1
-            # if train_loss <= best_loss_stop:
-            #     best_loss_stop = train_loss
-            #     pcc_early_stop = step_pcc_early_stop
-            # else:
-            #     pcc_early_stop -= 1
             if pcc_early_stop == 0:
                 print(f"Early stopping at epoch {epoch + 1}/{EPOCHS}")
                 break
@@ -197,7 +181,7 @@ class GraphRegressor(nn.Module):
                 'metrics': (r2, mae, pcc)
             }, f'{model_dir}/checkpoint.pt')
 
-            torch.cuda.empty_cache()  # 清理显存
+            torch.cuda.empty_cache()
 
         end_train = time()
         logging.info(f'Total training time... {end_train - start_train:.2f}s')
@@ -243,61 +227,54 @@ class GraphRegressor(nn.Module):
 
         mseLoss = nn.MSELoss(reduction='mean')
         MSE = mseLoss(preds_tensor, labels_tensor).item()
-        # HuberLoss = nn.HuberLoss(reduction='mean', delta=1.0)
-        # eval_loss = HuberLoss(preds_tensor, labels_tensor).item()
 
         if Is_test:
-            # 输出每个蛋白质的真实标签和预测标签
+            # Output the true label and predicted label for each protein.
             protein_results = list(zip(name_protein, labels, preds))
 
-            # 打开一个 CSV 文件并设置写入模式
+            # Open a CSV file and set the write mode
             output_dir = model_load
             os.makedirs(output_dir, exist_ok=True)
-            # 收集预测值和真实值
+            # Collect predicted values and actual values
             all_preds = []
             all_labels = []
 
             with open('protein_results.csv', mode='w', newline='') as file:
                 writer = csv.writer(file)
 
-                # 写入CSV文件的表头
                 writer.writerow(['Protein', 'True Tm', 'Predicted Tm'])
 
-                # 遍历 protein_results，将数据写入 CSV
+                # Iterate through protein_results and write the data to CSV.
                 for name, true_label, pred_label in protein_results:
-                    # 检查是否有结束符 \x00，并去除
+                    # Check for the end character \x00 and remove it.
                     if name[-1] == '\x00':
                         name = name[:-4]
 
-                    # 打印输出
                     print(f'Protein: {name}, True Tm: {true_label}, Predicted Tm: {pred_label}')
 
                     all_preds.append(pred_label.cpu().numpy().flatten())
                     all_labels.append(true_label.numpy().flatten())
 
-                    # 将数据写入CSV文件
                     writer.writerow([name, true_label, pred_label])
 
             all_preds = np.concatenate(all_preds)
             all_labels = np.concatenate(all_labels)
-            # 确保输出目录存在
             output_heatmap_dir = os.path.join(model_load, 'heatmaps')
             os.makedirs(output_heatmap_dir, exist_ok=True)
-            # 绘制热力图
+            # Drawing a heat map
             plt.figure(figsize=(10, 8))
             sns.set(style='white')
             plt.hexbin(all_labels, all_preds, gridsize=50, cmap='viridis', bins='log')
             plt.colorbar(label='log10(count)')
 
-            # 获取当前坐标轴范围
             ax = plt.gca()
-            x_min, _ = ax.get_xlim()  # 自动获取 x 轴范围
-            y_min, _ = ax.get_ylim()  # 自动获取 y 轴范围
+            x_min, _ = ax.get_xlim()
+            y_min, _ = ax.get_ylim()
 
-            # 确保 y=x 直线覆盖整个视图范围（取 x 和 y 的并集）
+            # Ensure that the line y=x covers the entire view range (take the union of x and y).
             line_min = min(x_min, y_min)
 
-            # 绘制 y=x 直线（红色虚线）
+            # Draw the line y=x (red dotted line)
             plt.axline([line_min, line_min], slope=1, color='r', linestyle='--', linewidth=2, label='y = x')
 
             plt.xlabel('Actual Tm')
@@ -306,13 +283,13 @@ class GraphRegressor(nn.Module):
             plt.savefig(os.path.join(output_heatmap_dir, 'heatmap_hexbin.png'))
             plt.show()
 
-            # 使用seaborn的联合分布图
+            # Using Seaborn joint distribution plot
             g = sns.jointplot(x=all_labels, y=all_preds, kind='hex', color='blue', height=8)
             g.set_axis_labels('Actual Tm', 'Predicted Tm', fontsize=12)
             plt.savefig(os.path.join(output_heatmap_dir, 'heatmap_joint.png'))
             plt.show()
 
-            # 另外可以添加散点图以显示趋势线
+            # You can also add scatter plots to display trend lines.
             plt.figure(figsize=(8, 6))
             sns.regplot(x=all_labels, y=all_preds, scatter_kws={'alpha': 0.3})
             plt.xlabel('Actual Tm')
@@ -320,10 +297,9 @@ class GraphRegressor(nn.Module):
             plt.title('Actual vs Predicted Tm with Regression Line')
             plt.savefig(os.path.join(output_heatmap_dir, 'scatter_regression.png'))
             plt.show()
-            # 计算残差
             residuals = labels_tensor - preds_tensor
 
-            # 绘制残差图
+            # Plot residuals
             plt.figure(figsize=(10, 6))
             plt.scatter(preds_tensor.cpu().numpy(), residuals.cpu().numpy(), alpha=0.5)
             plt.hlines(y=0, xmin=np.min(preds_tensor.cpu().numpy()), xmax=np.max(preds_tensor.cpu().numpy()),
@@ -333,7 +309,7 @@ class GraphRegressor(nn.Module):
             plt.title('Residuals vs Predicted Values')
             plt.show()
 
-            # 绘制Q-Q图
+            # Draw a Q-Q plot
             plt.figure(figsize=(10, 6))
             stats.probplot(residuals.cpu().numpy(), dist="norm", plot=plt)
             plt.title('Q-Q Plot of Residuals')
@@ -342,8 +318,6 @@ class GraphRegressor(nn.Module):
         return MSE, r2, mae, pcc, name_protein, (top_k_nodes, top_k_relations, top_k_attention_weights)
 
     def predict(self, graph_loader, device='cpu'):
-        # self.eval()
-        # self.to(device)
 
         data_iter = tqdm(
             graph_loader,
@@ -384,10 +358,10 @@ class AutoEncoder(nn.Module):
         self.feat_dim = feat_dim
         self.embed_dim = embed_dim
         self.activation = activation
-        self.noise_std = noise_std  # 保存噪声标准差
+        self.noise_std = noise_std  # Save noise standard deviation
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
-        # 自编码器初始化
+        # Autoencoder initialization
         tmp = []
         tmp.append(self.feat_dim)
         if self.feat_dim < self.embed_dim:
@@ -402,16 +376,6 @@ class AutoEncoder(nn.Module):
             self.decoder.append(nn.Sequential(
                 nn.Linear(tmp[-(j + 1)], tmp[-(j + 2)]), self._get_activation_fn(activation)
             ))
-        # for i in range(num_layers):
-        #     self.encoder.append(nn.Sequential(
-        #         nn.Linear(tmp[i], self.embed_dim), self._get_activation_fn(activation)
-        #     ))
-        #     tmp.append(self.embed_dim)
-        # for j in range(num_layers):
-        #     self.decoder.append(nn.Sequential(
-        #         nn.Linear(tmp[-(j + 1)], tmp[-(j + 2)]), self._get_activation_fn(activation)
-        #     ))
-
 
     @staticmethod
     def _get_activation_fn(activation):
@@ -437,7 +401,7 @@ class AutoEncoder(nn.Module):
 
         return act_fn
 
-    def forward(self, feat):     # (self, graph, feat, embedder):
+    def forward(self, feat):
         h = feat
         # 在初始阶段对每个节点加入高斯白噪声
         noise = torch.randn_like(feat) * self.noise_std
@@ -445,27 +409,23 @@ class AutoEncoder(nn.Module):
         for i, layer in enumerate(self.encoder):
             feat = layer(feat)
         encode = feat
-        # encode, (top_k_nodes, top_k_relations, top_k_attention_weights) = embedder(graph, feat)
-        # feat = encode
         for i, layer in enumerate(self.decoder):
             feat = layer(feat)
-        return h, encode, feat     # h, encode, feat, (top_k_nodes, top_k_relations, top_k_attention_weights)
+        return h, encode, feat
 
 
 class MuxGNNGraph(nn.Module):
     def __init__(
             self,
-            gnn_type,
             num_gnn_layers,
             relations,
             embed_dim,
             dim_a,
             dropout=0.,
             activation=None,
-            use_autoencoder=True  # 使用自编码器的标志
+            use_autoencoder=True  # Signs of using autoencoders
     ):
         super(MuxGNNGraph, self).__init__()
-        self.gnn_type = gnn_type
         self.num_gnn_layers = num_gnn_layers
         self.relations = relations
         self.num_relations = len(self.relations)
@@ -476,31 +436,16 @@ class MuxGNNGraph(nn.Module):
         self.use_autoencoder = use_autoencoder
 
         self.layers = nn.ModuleList(
-                [MuxGNNLayer(gnn_type=gnn_type,
-                            relations=self.relations,
-                            in_dim=self.embed_dim,
-                            out_dim=self.dim_a,
-                            dim_a=self.dim_a,
-                            dropout=self.dropout,
-                            activation=self.activation,)]
+                [MuxGNNLayer(relations=self.relations, in_dim=self.embed_dim, out_dim=self.dim_a, dim_a=self.dim_a,
+                             dropout=self.dropout, activation=self.activation)]
         )
         for _ in range(1, self.num_gnn_layers):
             self.layers.append(
-                MuxGNNLayer(
-                    gnn_type=self.gnn_type,
-                    relations=self.relations,
-                    in_dim=self.dim_a,
-                    out_dim=self.dim_a,
-                    dim_a=self.dim_a,
-                    dropout=self.dropout,
-                    activation=self.activation,
-                )
+                MuxGNNLayer(relations=self.relations, in_dim=self.dim_a, out_dim=self.dim_a, dim_a=self.dim_a,
+                            dropout=self.dropout, activation=self.activation)
             )
 
         self.alpha = nn.Parameter(torch.ones(self.num_gnn_layers - 1))  # 残差连接中可学习的参数 alpha
-        # self.readout_fn = AvgPooling()
-        # self.gate_nn = nn.Linear(in_features=self.embed_dim, out_features=1)
-        # self.readout_fn = GlobalAttentionPooling(self.gate_nn)
 
     @staticmethod
     def _get_activation_fn(activation):
@@ -512,6 +457,9 @@ class MuxGNNGraph(nn.Module):
             act_fn = nn.ELU()
         elif activation == 'gelu':
             act_fn = nn.GELU()
+        elif activation == 'softmax':
+            # Softmax requires specifying the dimension to apply it to
+            act_fn = nn.Softmax(dim=-1)
         else:
             raise ValueError('Invalid activation function.')
 
@@ -529,16 +477,14 @@ class MuxGNNGraph(nn.Module):
             if i == 0:
                 h = h_new
             else:
-                # h = h_new + h
                 h = alpha[i - 1] * h_new + (1 - alpha[i - 1]) * h
 
-        return h, attention_weights  # self.readout_fn(graph, h)
+        return h, attention_weights
 
 
 class MuxGNNLayer(nn.Module):
     def __init__(
             self,
-            gnn_type,
             relations,
             in_dim,
             out_dim,
@@ -548,7 +494,6 @@ class MuxGNNLayer(nn.Module):
             use_autoencoder=True,  # 使用自编码器的标志
     ):
         super(MuxGNNLayer, self).__init__()
-        self.gnn_type = gnn_type
         self.relations = relations
         self.num_relations = len(self.relations)
         self.use_autoencoder = use_autoencoder
@@ -560,71 +505,15 @@ class MuxGNNLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.activation = self._get_activation_fn(self.act_str)
 
-        if self.gnn_type == 'hgtconv':
-            self.num_heads = 8
-            self.head_size = self.out_dim / self.num_heads
-            self.num_etypes = self.num_relations
-            self.num_ntypes = 1
-        if self.gnn_type == 'gcn':
-            self.gnn = GraphConv(
-                in_feats=self.in_dim,
-                out_feats=self.out_dim,
-                norm='both',
-                weight=True,
-                bias=True,
-                activation=self.activation,
-                allow_zero_in_degree=True
-            )
-        elif self.gnn_type == 'gat':
-            self.gnn = GATConv(
-                in_feats=self.in_dim,
-                out_feats=self.out_dim,
-                num_heads=4,
-                feat_drop=dropout,
-                residual=False,
-                activation=self.activation,
-                allow_zero_in_degree=True
-            )
-        elif self.gnn_type == 'gin':
-            self.gnn = GINConv(
-                apply_func=nn.Sequential(
-                    nn.Linear(self.in_dim, self.out_dim),
-                    self.dropout,
-                    self.activation,
-                    nn.Linear(self.out_dim, self.out_dim),
-                    self.dropout,
-                    self.activation,
-                ),
-                aggregator_type='mean',
-            )
-        elif self.gnn_type == 'sage':
-            self.gnn = SAGEConv(
-                in_feats=self.in_dim,
-                out_feats=self.out_dim,
-                aggregator_type='pool',
-                feat_drop=dropout,
-                activation=self.activation
-            )
-        elif self.gnn_type == 'hgt':
-            self.gnn = HGT(
-                in_dim=self.in_dim,
-                out_dim=self.out_dim,
-                num_types=1,
-                num_relations=self.relations,
-                n_heads=2,
-                dropout=dropout,
-                use_norm=True
-            )
-        elif self.gnn_type == 'hgtconv':
-            self.gnn = HGTConv(
-                in_size=self.in_dim,
-                head_size=self.head_size,
-                num_heads=self.num_heads,
-                num_etypes=self.num_etypes,
-                num_ntypes=self.num_ntypes,
-                dropout=self.dropout,
-                use_norm=True
-            )
+        self.gnn = GraphConv(
+            in_feats=self.in_dim,
+            out_feats=self.out_dim,
+            norm='both',
+            weight=True,
+            bias=True,
+            activation=self.activation,
+            allow_zero_in_degree=True
+        )
 
         self.attention = SemanticAttentionBatched(self.num_relations, self.out_dim, self.dim_a, dropout=dropout)
 
@@ -646,6 +535,9 @@ class MuxGNNLayer(nn.Module):
             act_fn = nn.Tanh()
         elif activation == 'selu':
             act_fn = nn.SELU()
+        elif activation == 'softmax':
+            # Softmax requires specifying the dimension to apply it to
+            act_fn = nn.Softmax(dim=-1)
         else:
             raise ValueError('Invalid activation function.')
 
@@ -655,26 +547,9 @@ class MuxGNNLayer(nn.Module):
         h = torch.zeros(self.num_relations, graph.num_nodes(), self.out_dim, device=graph.device)
 
         with graph.local_scope():
-            if self.gnn_type == 'hgtconv':
-                h = self.gnn(graph, feat)
             for i, graph_layer in enumerate(self.relations):
-                rel_graph = graph['node', graph_layer, 'node']
-
-                if self.gnn_type == 'hgt':
-                    source_nodes, destination_nodes, edges = rel_graph.edges(form='all')
-                    edge_index = torch.stack((source_nodes, destination_nodes))
-                    edge_weights = rel_graph.edges[graph_layer].data['weight']
-                    edge_index = torch.cat((edge_index, edge_weights.T), dim=0)
-                    node_type = torch.zeros(feat.size(0)).to(feat.device)
-                    edge_type = torch.full((edge_index[0].size(0),), i, dtype=torch.long, device=rel_graph.device)
-                    edge_time = torch.zeros(edge_index[0].size(0), dtype=torch.long, device=rel_graph.device)
-                    h_out = self.gnn(feat, node_type, edge_index, edge_type, edge_time)
-                    h_out = self.layer_norm(h_out)
-                else:
-                    h_out = self.gnn(rel_graph, feat).squeeze()
-                    if self.gnn_type == 'gat':
-                        h_out = h_out.sum(dim=1)
-                    # h_out = self.layer_norm(h_out)
+                rel_graph = graph[graph_layer]
+                h_out = self.gnn(rel_graph, feat).squeeze()
                 h[i] = h_out
 
         if self.norm:
@@ -684,7 +559,6 @@ class MuxGNNLayer(nn.Module):
         if Is_last:
             attention_weights = self.attention.get_top_k_nodes()
             return h, attention_weights
-        # h = self.attention(graph, h, Is_attention=Is_attention)
 
         return h
 

@@ -1,0 +1,18 @@
+Mean Score,Parameters,Best Parameters,Best Score,Accuracy,Precision,Recall,F1 Score
+0.5788656690746474,"{'C': 0.1, 'gamma': 'scale', 'kernel': 'linear'}",,,,,,
+0.8193197454420365,"{'C': 0.1, 'gamma': 'scale', 'kernel': 'rbf'}",,,,,,
+0.5788656690746474,"{'C': 0.1, 'gamma': 'auto', 'kernel': 'linear'}",,,,,,
+0.5788656690746474,"{'C': 0.1, 'gamma': 'auto', 'kernel': 'rbf'}",,,,,,
+0.5854360165118679,"{'C': 0.2, 'gamma': 'scale', 'kernel': 'linear'}",,,,,,
+0.8212805297557619,"{'C': 0.2, 'gamma': 'scale', 'kernel': 'rbf'}",,,,,,
+0.5854360165118679,"{'C': 0.2, 'gamma': 'auto', 'kernel': 'linear'}",,,,,,
+0.5788656690746474,"{'C': 0.2, 'gamma': 'auto', 'kernel': 'rbf'}",,,,,,
+0.781204850361197,"{'C': 0.5, 'gamma': 'scale', 'kernel': 'linear'}",,,,,,
+0.8232456140350877,"{'C': 0.5, 'gamma': 'scale', 'kernel': 'rbf'}",,,,,,
+0.781204850361197,"{'C': 0.5, 'gamma': 'auto', 'kernel': 'linear'}",,,,,,
+0.5788656690746474,"{'C': 0.5, 'gamma': 'auto', 'kernel': 'rbf'}",,,,,,
+0.8088020295837633,"{'C': 1, 'gamma': 'scale', 'kernel': 'linear'}",,,,,,
+0.8232499140006879,"{'C': 1, 'gamma': 'scale', 'kernel': 'rbf'}",,,,,,
+0.8088020295837633,"{'C': 1, 'gamma': 'auto', 'kernel': 'linear'}",,,,,,
+0.5788656690746474,"{'C': 1, 'gamma': 'auto', 'kernel': 'rbf'}",,,,,,
+,,"{'C': 1, 'gamma': 'scale', 'kernel': 'rbf'}",0.8232499140006879,0.8481675392670157,0.9813084112149533,0.6521739130434783,0.7835820895522387
