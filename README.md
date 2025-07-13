@@ -7,6 +7,13 @@ In this project, we provide a specific implementation of HG-RIFN in Pytorch. The
 
 + ```baseLineModels/``` stores all baseline algorithm implementations, such as GCN.py (GCN code).
 
+## Data preprocessing
+
+Run the ```data/main_reg.py``` file, which is a script file used to query ***pLDDT*** for Alphafold3-predicted protein structures. The following options are supported:
+```bash
+python data/HGEProTstab/preprocess/pLDDT.py [--dataset]
+```
+
 ## RUN
 
 Run the ```main_reg.py``` file, which is the main script file used to ***train*** the protein thermal stability **regression** model. The following options are supported:
