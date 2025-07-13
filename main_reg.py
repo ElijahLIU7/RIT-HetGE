@@ -31,7 +31,8 @@ def objective(trial):
     weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-4, log=True)
     accum_steps = trial.suggest_int('accum_steps', 1, 5)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    args.cuda = torch.cuda.is_available() and args.cuda
+    device = torch.device('cuda' if args.cuda else 'cpu')
     out_model_dir = f'{args.input}/{model_name}_LR{lr}'
     os.makedirs(out_model_dir, exist_ok=True)
     # for Lambda1 in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
@@ -213,6 +214,7 @@ if __name__ == '__main__':
     parser.add_argument('--data', type=str, default='HGEProTstab')
     parser.add_argument('--n_trials', type=int, default=20,
                         help='Number of trial runs.')
+    parser.add_argument('--cuda', type=bool, default=True, help='cuda or not.')
 
     args = parser.parse_args()
 
