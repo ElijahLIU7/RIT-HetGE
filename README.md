@@ -18,16 +18,16 @@ python data/HGEProTstab/preprocess/pLDDT.py [--dataset]
 
 Run the ```main_reg.py``` file, which is the main script file used to ***train*** the protein thermal stability **regression** model. The following options are supported:
 ```bash
-python main_reg.py [--input] [--results] [--data] [n_trials] [--cuda]
+python script/main_reg.py [--input] [--results] [--data] [n_trials] [--cuda]
 ```
 
 Run the ```main_cls.py``` file, which is the main script file used to ***train*** the protein thermal stability **classification** model. The following options are supported:
 ```bash
-python main_cls.py  [--input] [--results] [--data] [n_trials] [--cuda]
+python script/main_cls.py  [--input] [--results] [--data] [n_trials] [--cuda]
 ```
 Run the test_cls.py file, which is the main script file used to ***test*** the saved optimal protein thermal stability **regression** model. The following options are supported:
 ```bash
-python test_reg.py 
+python script/test_reg.py 
 ```
 
 Run the test_cls.py file, which is the main script file used to ***test*** the saved optimal protein thermal stability **classification** model. The following options are supported:

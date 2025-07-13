@@ -6,7 +6,7 @@ import optuna
 import csv
 
 from HGRIFN.HG_RIFN_reg import GraphRegressor
-from HGRIFN.utils import load_graphpred_dataset, load_graphpred_testDataset
+from HGRIFN.utils import load_dataset, load_testDataset
 
 
 def objective(trial):
@@ -79,7 +79,7 @@ def objective(trial):
         (train_dataset,
          valid_dataset,
          feat_dim,
-         relations) = load_graphpred_dataset(args.input, CV_FOLDS, cv_select=cv_fold, bidirected=args.bidirected)
+         relations) = load_dataset(args.input, CV_FOLDS, cv_select=cv_fold)
 
         model = GraphRegressor(num_gnn_layers=num_gcn_layer, num_coder_layers=num_coders_layers, relations=relations,
                                feat_dim=feat_dim, embed_dim=embed_dim, dim_a=dim_a, dropout=dropout,
@@ -124,7 +124,7 @@ def objective(trial):
         if best_valid_loss < best_valid_losses:
             best_valid_losses = best_valid_loss
 
-        test_dataset = load_graphpred_testDataset(args.input, bidirected=args.bidirected, is_CNN=True)
+        test_dataset = load_testDataset(args.input, is_CNN=True)
         t_loss, t_r2, t_mae, t_pcc, name_protein, (
         t_top_k_nodes, t_top_k_relations, top_k_attention_weights) = model.eval_model(
             test_dataset, batch_size=1, num_workers=args.num_workers, device=device, Is_test=True,

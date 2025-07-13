@@ -6,7 +6,7 @@ import optuna
 import csv
 
 from HGRIFN.HG_RIFN_cls import GraphClassifier
-from HGRIFN.utils import load_graphpred_dataset, load_graphpred_testDataset
+from HGRIFN.utils import load_dataset, load_testDataset
 
 
 def objective(trial):
@@ -69,7 +69,7 @@ def objective(trial):
 
         CV_FOLDS = 10
         best_ACCs = 0
-        test_dataset = load_graphpred_testDataset(args.input, bidirected=args.bidirected, is_classification=True)
+        test_dataset = load_testDataset(args.input, is_classification=True)
         for cv_fold in range(CV_FOLDS):
             print(f'CV Fold: {cv_fold}')
             with open(log_fname, 'a') as f:
@@ -79,7 +79,7 @@ def objective(trial):
             (train_dataset,
              valid_dataset,
              feat_dim,
-             relations) = load_graphpred_dataset(args.input, CV_FOLDS, cv_select=cv_fold, bidirected=args.bidirected, is_classification=True)
+             relations) = load_dataset(args.input, CV_FOLDS, cv_select=cv_fold, is_classification=True)
 
             model = GraphClassifier(
                 gnn_type=gnn,
