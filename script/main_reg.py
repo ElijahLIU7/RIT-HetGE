@@ -33,9 +33,9 @@ def objective(trial):
 
     args.cuda = torch.cuda.is_available() and args.cuda
     device = torch.device('cuda' if args.cuda else 'cpu')
-    out_model_dir = f'{args.input}/{model_name}_LR{lr}'
+    out_model_dir = f'{args.output}/Best_{model_name}_result'
     os.makedirs(out_model_dir, exist_ok=True)
-    # for Lambda1 in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+    # for Lambda1 in [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]:
     Lambda1 = 1
     Lambda2 = 2 - Lambda1
 
@@ -57,7 +57,7 @@ def objective(trial):
     print("     Lambda2:", Lambda2)
 
     log_path = f'./logs/{model_name}'
-    log_fname = f'{log_path}/log_HG-RIFN.out'
+    log_fname = f'{log_path}/log.out'
     os.makedirs(log_path, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
@@ -124,7 +124,7 @@ def objective(trial):
         if best_valid_loss < best_valid_losses:
             best_valid_losses = best_valid_loss
 
-        test_dataset = load_testDataset(args.input, is_CNN=True)
+        test_dataset = load_testDataset(args.results, is_CNN=True)
         t_loss, t_r2, t_mae, t_pcc, name_protein, (
         t_top_k_nodes, t_top_k_relations, top_k_attention_weights) = model.eval_model(
             test_dataset, batch_size=1, num_workers=args.num_workers, device=device, Is_test=True,
@@ -181,7 +181,7 @@ def objective(trial):
             writer.writerow({
                 'Fold': cv_fold,
                 'model_name': model_name,
-                'data_dir': args.input,
+                'data_dir': args.output,
                 'num_gcn_layer': num_gcn_layer,
                 'embed_dim': embed_dim,
                 'dim_a': dim_a,
@@ -207,10 +207,8 @@ def objective(trial):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('--input', type=str, default='./data/HRIN-ProTstab',
-                        help='The address of preprocessed graph.')
-    parser.add_argument('--results', type=str, default='./results',)
+    parser.add_argument('--input', type=str, default='data/HRIN-ProTstab/')
+    parser.add_argument('--results', type=str, default='./results/HRIN-ProTstab',)
     parser.add_argument('--data', type=str, default='HRIN-ProTstab')
     parser.add_argument('--n_trials', type=int, default=20,
                         help='Number of trial runs.')

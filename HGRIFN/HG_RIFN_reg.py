@@ -21,12 +21,12 @@ import matplotlib.pyplot as plt
 class GraphRegressor(nn.Module):
     def __init__(
             self,
-            num_gnn_layers,
-            num_coder_layers,
-            relations,
-            feat_dim,
-            embed_dim,
-            dim_a,
+            num_gnn_layers=1,
+            num_coder_layers=1,
+            relations=6,
+            feat_dim=572,
+            embed_dim=32,
+            dim_a=6,
             dropout=0.,
             activation=None
     ):
@@ -54,7 +54,6 @@ class GraphRegressor(nn.Module):
 
     def forward(self, graph):
         feat = graph.ndata['emb'].float()  # message passing only supports float dtypes
-        # feat, embed, decoded, (top_k_nodes, top_k_relations, top_k_attention_weights) = self.autoEncoder(graph, feat, self.embedder)
         feat, embed, decoded = self.autoEncoder(feat)
         embeded, attention_weights = self.embedder(graph, embed)
         # Call regressor to get output and top K nodes with their attention weights

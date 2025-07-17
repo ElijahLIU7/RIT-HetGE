@@ -14,9 +14,9 @@ from HGRIFN.HG_RIFN_reg import GraphRegressor
 from HGRIFN.utils import load_dataset, load_testDataset
 
 
-def load_graphpred_dataset(dataset):
-    data_path = f'D:/program/GitHub/protein_wang/data/output_Fold_regression'
-    graph_path = f'{data_path}/graphs_with_labels_train_fold0_stand_last.bin'
+def load_graphpred_dataset(data):
+    data_path = data
+    graph_path = f'{data_path}/graphs_test_fold0.bin'
     graphs, graph_attr = dgl.load_graphs(graph_path)
 
     relations = ['VDW', 'PIPISTACK', 'HBOND', 'IONIC', 'SSBOND', 'PICATION']
@@ -35,7 +35,7 @@ def load_graphpred_dataset(dataset):
         test_labels.append(lbl)
         test_name_protein.append(name_protein)
 
-    test_dataset = Graphdataset(dataset, test_graphs, torch.FloatTensor(test_labels), test_name_protein)
+    test_dataset = Graphdataset(data, test_graphs, torch.FloatTensor(test_labels), test_name_protein)
 
     return test_dataset, feat_dim, relations
 
@@ -68,53 +68,17 @@ class Graphdataset(DGLDataset):
 
 def objective(trial):
     """
-    使用optuna优化模型参数
+    Optimize the model parameters using optuna
     """
-    # 定于超参数搜索空间
     print('Version: HG-RIFN_regression_test')
-    dataset = trial.suggest_categorical('dataset', ['train_autoencoder'])
-    model_name = trial.suggest_categorical('model_name', [f'graphs_with_regression_{dataset}_skip_batch'])
-    data_dir = trial.suggest_categorical('data_dir', ['D:/program/GitHub/protein_wang/data/output_test'])
-    gnn = trial.suggest_categorical('gnn', ['gin'])  # 'gin', 'gcn', 'gat', 'hgt'
-    num_gnn_layer = 2        # 3
-    num_coders_layers = 2
-    pos_class_weight = 1.0  # trial.suggest_float('pos_class_weight', 0.5, 2.0)
-    # 先定义一个较大的范围以便 trial 进行选择
-    embed_dim = 1024
-    dim_a = 27        # 19
-    dropout = 0.27759357302825227
-    activation = trial.suggest_categorical('activation', ['elu'])
-    batch_size = 1
-    epochs = 600
-    lr = 0.00035860335262601496 # 5.109265806384588e-05
-    weight_decay = 3.5860335262601496e-06
-    accum_steps = 1  # 在权重更新之前要进行的梯度累积步骤数
+    data = args.data
+    model_name = f'regression_{data}_test'
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # out_model_dir = "E:/dataset/结果/protein_wang/交叉验证最优模型保存/0.85"
-    # out_model_dir = "D:/program/GitHub/protein_wang/data/output_Fold_regression/graphs_with_regression_train_skip_LR8.825812779106674e-05"       # 7.091007092290207e-05"
-    # out_model_dir = f'D:/program/GitHub/protein_wang/data/output_Fold_regression/graphs_with_regression_train_skip_batch_LR{lr}'
-    # out_model_dir = f'E:/dataset/结果/protein_wang/交叉验证最优模型保存/0.85'
-    out_model_dir = f'{args.input}/{model_name}_LR{lr}'
-    os.makedirs(out_model_dir, exist_ok=True)
+    model_dir = f'{args.output}/Best_{model_name}_result'
 
-    # 输出所有参数定义值
-    print("Parameters:")
-    print("     gnn:", gnn)
-    print("     num_gnn_layer:", num_gnn_layer)
-    print("     pos_class_weight:", pos_class_weight)
-    print("     embed_dim:", embed_dim)
-    print("     dim_a:", dim_a)
-    print("     dropout:", dropout)
-    print("     activation:", activation)
-    print("     batch_size:", batch_size)
-    print("     epochs:", epochs)
-    print("     lr:", lr)
-    print("     weight_decay:", weight_decay)
-    print("     accum_steps:", accum_steps)
-
-    log_path = f'protein_wang/logs/{dataset}/{model_name}'
-    log_fname = f'{log_path}/test_log_{gnn}_{dataset}_LastAttention.out'
+    log_path = f'./logs/{model_name}'
+    log_fname = f'{log_path}/test_log.out'
     os.makedirs(log_path, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
@@ -126,24 +90,14 @@ def objective(trial):
 
     (test_dataset,
      feat_dim,
-     relations) = load_graphpred_dataset(dataset)
+     relations) = load_graphpred_dataset(data)
 
-    model = GraphRegressor(
-        gnn_type=gnn,
-        num_gnn_layers=num_gnn_layer,
-        num_coder_layers=num_coders_layers,
-        relations=relations,
-        feat_dim=feat_dim,
-        embed_dim=embed_dim,
-        dim_a=dim_a,
-        dropout=dropout,
-        activation=activation
-    )
+    model = GraphRegressor()
     t_loss, t_r2, t_mae, t_pcc, name_protein, (t_top_k_nodes, t_top_k_relations, top_k_attention_weights) = model.eval_model(
-        test_dataset, batch_size=batch_size, num_workers=args.num_workers, device=device, Is_test=True, model_load=out_model_dir, Is_Best_test=False
+        test_dataset, device=device, Is_test=True, model_load=model_dir, Is_Best_test=True
     )
 
-    Tm = pd.read_csv(f'F:/dataset/protein/test2_dataset.csv')
+    Tm = pd.read_csv(f'{args.input}/test_dataset.csv')
     Tm['Protein_ID'] = Tm['Protein_ID'].apply(lambda x: re.split('_|-', x)[0])
     Tm_dict = pd.Series(Tm.Tm.values, index=Tm.Protein_ID).to_dict()
     # 定义氨基酸三字母简写和一字母简写的对应字典
@@ -170,7 +124,7 @@ def objective(trial):
         'C': 'CYS'
     }
 
-    # 将结果和超参数写入CSV文件
+    # Write the results and hyperparameters to the CSV file
     with open(log_fname, 'a') as f:
         f.write(
             '\n'.join(
@@ -183,14 +137,14 @@ def objective(trial):
             )
         )
 
-    # 测试集K-top
-    output_dir = f'F:/dataset/结果/protein_wang/regression/Test_Graph_top_k'
+    # Test set K-top
+    output_dir = f'{args.results}/regression/Test_Graph_top_k'
     os.makedirs(output_dir, exist_ok=True)
     for name, nodes, relations, weights in zip(name_protein, t_top_k_nodes, t_top_k_relations, top_k_attention_weights):
         if name[-1] == '\x00':
             name = name[:-4]
         # Read the uploaded FASTA file and calculate the length of the second line
-        fasta_file_path = f'F:/dataset/protein/FASTA/test2_dataset_fasta/{name}.fasta'
+        fasta_file_path = f'{args.input}/FASTA/test2_dataset_fasta/{name}.fasta'
         # Read the file and extract the second line
         with open(fasta_file_path, 'r') as file:
             lines = file.readlines()
@@ -211,44 +165,10 @@ def objective(trial):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--model_name', type=str, default='graphs_with_labels',
-                        help='Name to save the trained model.')
-    parser.add_argument('--input', type=str, default='D:/program/GitHub/protein_wang/data/output_Fold_regression',
-                        # output_Fold_balance_withLowTm',
-                        help='The address of preprocessed graph.')
-    parser.add_argument('--dataset', type=str, default='/real')
-    parser.add_argument('--model_dir', type=str, default='./model_save',
-                        help='The address for storing the models and optimization results.')
-    parser.add_argument('--gnn', type=str, default='hgt',
-                        help='GNN layer to use with muxGNN. "gcn", "gat", "hgt", or "gin". Default is "gin".')
-    parser.add_argument('--num_gnn_layer', type=int, default=1,
-                        help='Number of GNN layers in the embedding module.')
-    parser.add_argument('--pos_class_weight', type=float, default=1.,
-                        help='Additional weight to apply to loss contribution of positive class.')
-    parser.add_argument('--embed_dim', type=int, default=64,
-                        help='Size of output embedding dimension.')
-    parser.add_argument('--dim_a', type=int, default=16,
-                        help='Dimension of attention.')
-    parser.add_argument('--dropout', type=float, default=0.2,
-                        help='Dropout rate during training.')
-    parser.add_argument('--activation', type=str, default='elu',
-                        help='Activation function. Options are "relu", "elu", or "gelu".')
-    parser.add_argument('--batch_size', type=int, default=1,
-                        help='Batch size during training and inference.')
-    parser.add_argument('--epochs', type=int, default=10,
-                        help='Maximum limit on training epochs.')
-    parser.add_argument('--lr', type=float, default=1e-3,
-                        help='Learning rate for optimizer.')
-    parser.add_argument('--weight_decay', type=float, default=0.01,
-                        help='L2 regularization penalty.')
-    parser.add_argument('--accum_steps', type=int, default=4,
-                        help='Number of gradient accumulation steps to take before weight update.')
-    parser.add_argument('--num_workers', type=int, default=0,
-                        help='Number of worker processes.')
-    parser.add_argument('--bidirected', action='store_true', default=False,
-                        help='Use a bidirectional version of the input graphs.')
-    parser.add_argument('--n_trials', type=int, default=1,
-                        help='Number of trial runs.')
+    parser.add_argument('--input', type=str, default='data/HRIN-ProTstab/')
+    parser.add_argument('--results', type=str, default='./results/HRIN-ProTstab', )
+    parser.add_argument('--data', type=str, default='HRIN-ProTstab')
+    parser.add_argument('--cuda', type=bool, default=True, help='cuda or not.')
 
     args = parser.parse_args()
 

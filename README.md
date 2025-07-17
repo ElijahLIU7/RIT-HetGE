@@ -40,8 +40,8 @@ python script/test_reg.py
 ```
 
 Run the test_cls.py file, which is the main script file used to ***test*** the saved optimal protein thermal stability **classification** model. The following options are supported:
-```angular2html
-
+```bash
+python script/test_cls.py 
 ```
 
 ## Cite

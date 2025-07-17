@@ -62,18 +62,6 @@ def load_testDataset(dataset, is_classification=False, is_CNN=False):
             adj_matrix = torch.sparse_coo_tensor(indices, values, size=(6, num_nodes, num_nodes))
             adjacency_matrices.append(adj_matrix)
 
-            # if adj_matrix.is_sparse:
-            #     adj_dense = adj_matrix.to_dense().sum(dim=0)  # 聚合关系层，得到单一稠密矩阵
-            # else:
-            #     adj_dense = adj_matrix.numpy() if isinstance(adj_matrix, torch.Tensor) else adj_matrix
-            #
-            # plt.figure(figsize=(10, 8))
-            # plt.imshow(adj_dense, cmap='Reds', interpolation='nearest')
-            # plt.colorbar(label='Edge Weight')
-            # plt.xlabel('Node Index')
-            # plt.ylabel('Node Index')
-            # plt.show(block=True)
-
     test_dataset = Graphdataset(dataset, test_graphs, torch.FloatTensor(test_labels), test_name_protein,
                                 adjacency_matrices)
 
