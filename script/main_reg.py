@@ -208,10 +208,10 @@ def objective(trial):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input', type=str, default='./data/HGEProTstab',
+    parser.add_argument('--input', type=str, default='./data/HRIN-ProTstab',
                         help='The address of preprocessed graph.')
     parser.add_argument('--results', type=str, default='./results',)
-    parser.add_argument('--data', type=str, default='HGEProTstab')
+    parser.add_argument('--data', type=str, default='HRIN-ProTstab')
     parser.add_argument('--n_trials', type=int, default=20,
                         help='Number of trial runs.')
     parser.add_argument('--cuda', type=bool, default=True, help='cuda or not.')

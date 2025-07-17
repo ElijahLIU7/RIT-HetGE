@@ -50,7 +50,7 @@ def protein_made(args, fold_idx, folds):
     amino_acid_properties = {aa: [] for aa in amino_acid_map.keys()}
 
     # 读取AAindex文件
-    with open('D:/program/GitHub/protein/data/AAindex.txt', 'r') as file:
+    with open('data/HRIN-ProTstab/AAindex.txt', 'r') as file:
         content = file.read()
 
     # 按照属性块进行分割
@@ -347,58 +347,23 @@ def main():
     """
     图嵌入
     """
-    struction_idx = f'F:/dataset/protein/PSSM/{args.struction_type}_pssm'
+    struction_idx = f'data/HRIN-ProTstab/{args.struction_type}_pssm'
 
     Type_PSSM = [type[:-5] for type in os.listdir(struction_idx)]
 
-    # file_path = 'F:/dataset/protein/FASTA/full_dataset_sequences.fasta'
-    # # Open the file and read its contents
-    # with open(file_path, 'r') as file:
-    #     content = file.read()
-    # # Extract protein IDs from the file content
-    # protein_ids = re.findall(r'>(\S+)', content)
-    # # Extract IDs up to the first underscore
-    # Type_IDs = [id.split('_')[0] for id in protein_ids]
-    # Type_IDs = set(Type_IDs)
     Type = list(set(Type_PSSM))      # & set(Type_IDs))
 
     """
-    读取Tm信息
+    Read Tm information
     """
-    Tm = pd.read_csv(f'F:/dataset/protein/{args.struction_type}_dataset.csv')
-    # 截取 Protein_ID 列的 "_" 之前的内容
+    Tm = pd.read_csv(f'data/HRIN-ProTstab/{args.struction_type}_dataset.csv')
+    # Extract the content before the "_" in the Protein_ID column
     Tm['Protein_ID'] = Tm['Protein_ID'].apply(lambda x: re.split('_|-', x)[0])
     Tm_dict = pd.Series(Tm.Tm.values, index=Tm.Protein_ID).to_dict()
 
-    # # 绘制 Tm 温度的分布图
-    # plt.figure(figsize=(10, 6))
-    # sns.histplot(Tm['Tm'], kde=True, bins=30)
-    # plt.title(f'Tm Temperature Distribution of {args.struction_type}')
-    # plt.xlabel('Tm Temperature')
-    # plt.ylabel('Frequency')
-    # plt.grid(True)
-    # plt.show()
-    #
-    # # 将数据按照 Tm 温度等分
-    # Tm['Quantile'] = pd.qcut(Tm['Tm'], 2, labels=['Low', 'High'])
-    #
-    # # 绘制 Tm 温度的分布图
-    # plt.figure(figsize=(16, 12))
-    #
-    # # 分别绘制每一等分的 Tm 温度分布图
-    # for i, quantile in enumerate(['Low', 'High']):
-    #     plt.subplot(2, 1, i + 1)
-    #     sns.histplot(Tm[Tm['Quantile'] == quantile]['Tm'], kde=True, bins=30)
-    #     plt.title(f'Tm Temperature Distribution ({quantile}) of {args.struction_type}')
-    #     plt.xlabel('Tm Temperature')
-    #     plt.ylabel('Frequency')
-    #     plt.grid(True)
-    #
-    # plt.tight_layout()
-    # plt.show()
     fold = args.fold_size
-    plddt_data = pd.read_csv(f'./critical_residue/{args.struction_type}_plddt.csv')
-    # 创建样本列表
+    plddt_data = pd.read_csv(f'data/HRIN-ProTstab/{args.struction_type}_plddt.csv')
+    # Create a sample list
     all_samples = []
     for i, tmpTy in enumerate(Type):
         if tmpTy[-1] == '\x00':
@@ -409,10 +374,10 @@ def main():
         if plddt <= 70:
             continue
         all_samples.append((i, tmpTy, Tm_dict[tmpTy]))
-    # 打乱样本顺序
+    # Disrupt the sample order
     random.shuffle(all_samples)
-    # 将样本分配到每一折
-    if args.struction_type == 'test1' or args.struction_type == 'test2':
+    # Allocate the samples to each fold
+    if args.struction_type == 'test':
         folds = all_samples
 
         protein_made(args, 0, folds)
@@ -420,12 +385,6 @@ def main():
     else:
         fold_size = len(all_samples) // fold
         folds = [all_samples[i * fold_size:(i + 1) * fold_size] for i in range(fold)]
-        # for fold in range(args.fold_size):
-        #     protein_made(args, fold, folds[fold])
-
-        # with Pool(args.fold_size) as pool:
-        #     pool.starmap(protein_made,
-        #                  [(args, fold_idx, folds[fold_idx]) for fold_idx in range(args.fold_size)])
         for i in range(args.fold_size // 2):
             with Pool(2) as pool:
                 pool.starmap(protein_made,
@@ -433,15 +392,14 @@ def main():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Preprocess Lipase Data')
+    parser = argparse.ArgumentParser(description='Preprocess HRIN-ProTstab Data.')
 
     '''
         Dataset arguments
     '''
-    parser.add_argument('--output_dir', type=str, default='D:/program/GitHub/protein_wang/data/output_Fold_regression',        #'D:/program/GitHub/protein_wang/data/output_Fold_regression','F:/dataset/protein_wang/output_Fold_regression'
-                        help='The address to output.csv the preprocessed graph.')
-    parser.add_argument('--struction_type', type=str, default='train')
-    parser.add_argument('--fold_size', type=int, default=10,
+    parser.add_argument('--output_dir', type=str, default='data/HRIN-ProTstab/preprocess')
+    parser.add_argument('--data_type', type=str, default='train')
+    parser.add_argument('--num_cross', type=int, default=10,
                         help='Number of cross validation')
 
     args = parser.parse_args()

@@ -1,17 +1,26 @@
-# Heterogeneous Graph Protein Residue Interaction Fusion Network model (HG-RIFN)
+# Residue Interaction Type-Aware Heterogeneous Graph Embedding model (RIT-HetGE)
 
 ![Architecture of the Heterogeneous Graph Protein Residue Interaction Fusion Network model (HG-RIFN)](framwork.jpg)
 ## Overview
 
 In this project, we provide a specific implementation of HG-RIFN in Pytorch. The organizational structure of this code repository is as follows:
 
-+ ```baseLineModels/``` stores all baseline algorithm implementations, such as GCN.py (GCN code).
++ ```EXP/``` stores all baseline algorithms for solving graph classification and regression problems, such as GCN.py (GCN code), DHNE.py (DHNE code) and so on.
 
 ## Data preprocessing
 
+For the specific [HRIN-ProTstab](https://huggingface.co/datasets/ElijahL/HRIN-ProTstab) dataset download, please click on the URL. Place the downloaded dataset in path ```data/HRIN-ProTstab``` to complete the algorithm implementation.
+
 Run the ```data/main_reg.py``` file, which is a script file used to query ***pLDDT*** for Alphafold3-predicted protein structures. The following options are supported:
+
 ```bash
-python data/HGEProTstab/preprocess/pLDDT.py [--dataset]
+python data/HRIN-ProTstab/preprocess/pLDDT.py [--dataset]
+```
+
+Next, run ```dataset/RIN_generation.py``` file to create data that matches the model input.
+
+```bash
+python dataset/RIN_generation.py [--output_dir] [--data_type] [--num_cross]
 ```
 
 ## RUN
