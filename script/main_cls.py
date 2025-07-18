@@ -7,7 +7,7 @@ import csv
 import re
 import pandas as pd
 
-from HGRIFN.HG_RIFN_cls import GraphClassifier
+from HGRIFN.HG_RIFN_cls import HGraphClassifier
 from HGRIFN.utils import load_dataset, load_testDataset
 
 
@@ -82,7 +82,7 @@ def objective(trial):
          feat_dim,
          relations) = load_dataset(args.input, CV_FOLDS, cv_select=cv_fold, is_classification=True)
 
-        model = GraphClassifier(
+        model = HGraphClassifier(
             num_gnn_layers=num_gnn_layer,
             num_coder_layers=num_coders_layers,
             relations=relations,

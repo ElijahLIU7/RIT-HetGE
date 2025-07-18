@@ -10,7 +10,7 @@ import dgl
 import pandas as pd
 
 from dgl.data import DGLDataset
-from HGRIFN.HG_RIFN_reg import GraphRegressor
+from HGRIFN.HG_RIFN_reg import HGraphRegressor
 from HGRIFN.utils import load_dataset, load_testDataset
 
 
@@ -91,7 +91,7 @@ def objective(trial):
      feat_dim,
      relations) = load_graphpred_dataset(data)
 
-    model = GraphRegressor()
+    model = HGraphRegressor()
     t_loss, t_r2, t_mae, t_pcc, name_protein, (t_top_k_nodes, t_top_k_relations,
                                                top_k_attention_weights) = model.eval_model(
         test_dataset, device=device, Is_test=True, model_load=model_dir, Is_Best_test=True

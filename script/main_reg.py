@@ -7,7 +7,7 @@ import csv
 import re
 import pandas as pd
 
-from HGRIFN.HG_RIFN_reg import GraphRegressor
+from HGRIFN.HG_RIFN_reg import HGraphRegressor
 from HGRIFN.utils import load_dataset, load_testDataset
 
 
@@ -83,9 +83,9 @@ def objective(trial):
          feat_dim,
          relations) = load_dataset(args.input, CV_FOLDS, cv_select=cv_fold)
 
-        model = GraphRegressor(num_gnn_layers=num_gcn_layer, num_coder_layers=num_coders_layers, relations=relations,
-                               feat_dim=feat_dim, embed_dim=embed_dim, dim_a=dim_a, dropout=dropout,
-                               activation=activation)
+        model = HGraphRegressor(num_gnn_layers=num_gcn_layer, num_coder_layers=num_coders_layers, relations=relations,
+                                feat_dim=feat_dim, embed_dim=embed_dim, dim_a=dim_a, dropout=dropout,
+                                activation=activation)
 
         train_loss, valid_loss, valid_r2, valid_mae, valid_pcc = model.train_model(
             train_dataset,

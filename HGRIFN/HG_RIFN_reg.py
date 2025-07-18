@@ -18,7 +18,7 @@ from sklearn.metrics import r2_score, mean_absolute_error
 import matplotlib.pyplot as plt
 
 
-class GraphRegressor(nn.Module):
+class HGraphRegressor(nn.Module):
     def __init__(
             self,
             num_gnn_layers=1,
@@ -30,7 +30,7 @@ class GraphRegressor(nn.Module):
             dropout=0.,
             activation=None
     ):
-        super(GraphRegressor, self).__init__()
+        super(HGraphRegressor, self).__init__()
         self.num_gnn_layers = num_gnn_layers
         self.num_coder_layers = num_coder_layers
         self.relations = relations
@@ -46,9 +46,9 @@ class GraphRegressor(nn.Module):
         self.autoEncoder = AutoEncoder(num_layers=self.num_coder_layers, feat_dim=self.feat_dim,
                                        embed_dim=self.embed_dim, activation=self.activation)
 
-        self.embedder = MuxGNNGraph(num_gnn_layers=self.num_gnn_layers, relations=self.relations,
-                                    embed_dim=self.embed_dim, dim_a=self.dim_a, dropout=self.dropout,
-                                    activation=self.activation)
+        self.embedder = IntraGraph(num_gnn_layers=self.num_gnn_layers, relations=self.relations,
+                                   embed_dim=self.embed_dim, dim_a=self.dim_a, dropout=self.dropout,
+                                   activation=self.activation)
 
         self.regressor = Regressor(self.dim_a, self.activation, top_k=20)
 
@@ -413,7 +413,7 @@ class AutoEncoder(nn.Module):
         return h, encode, feat
 
 
-class MuxGNNGraph(nn.Module):
+class IntraGraph(nn.Module):
     def __init__(
             self,
             num_gnn_layers,
@@ -424,7 +424,7 @@ class MuxGNNGraph(nn.Module):
             activation=None,
             use_autoencoder=True  # Signs of using autoencoders
     ):
-        super(MuxGNNGraph, self).__init__()
+        super(IntraGraph, self).__init__()
         self.num_gnn_layers = num_gnn_layers
         self.relations = relations
         self.num_relations = len(self.relations)
@@ -435,13 +435,13 @@ class MuxGNNGraph(nn.Module):
         self.use_autoencoder = use_autoencoder
 
         self.layers = nn.ModuleList(
-                [MuxGNNLayer(relations=self.relations, in_dim=self.embed_dim, out_dim=self.dim_a, dim_a=self.dim_a,
-                             dropout=self.dropout, activation=self.activation)]
+                [IntraLayer(relations=self.relations, in_dim=self.embed_dim, out_dim=self.dim_a, dim_a=self.dim_a,
+                            dropout=self.dropout, activation=self.activation)]
         )
         for _ in range(1, self.num_gnn_layers):
             self.layers.append(
-                MuxGNNLayer(relations=self.relations, in_dim=self.dim_a, out_dim=self.dim_a, dim_a=self.dim_a,
-                            dropout=self.dropout, activation=self.activation)
+                IntraLayer(relations=self.relations, in_dim=self.dim_a, out_dim=self.dim_a, dim_a=self.dim_a,
+                           dropout=self.dropout, activation=self.activation)
             )
 
         self.alpha = nn.Parameter(torch.ones(self.num_gnn_layers - 1))  # 残差连接中可学习的参数 alpha
@@ -481,7 +481,7 @@ class MuxGNNGraph(nn.Module):
         return h, attention_weights
 
 
-class MuxGNNLayer(nn.Module):
+class IntraLayer(nn.Module):
     def __init__(
             self,
             relations,
@@ -492,7 +492,7 @@ class MuxGNNLayer(nn.Module):
             activation=None,
             use_autoencoder=True,  # 使用自编码器的标志
     ):
-        super(MuxGNNLayer, self).__init__()
+        super(IntraLayer, self).__init__()
         self.relations = relations
         self.num_relations = len(self.relations)
         self.use_autoencoder = use_autoencoder
@@ -514,7 +514,7 @@ class MuxGNNLayer(nn.Module):
             allow_zero_in_degree=True
         )
 
-        self.attention = SemanticAttentionBatched(self.num_relations, self.out_dim, self.dim_a, dropout=dropout)
+        self.attention = InterAttentionBatched(self.num_relations, self.out_dim, self.dim_a, dropout=dropout)
 
         # self.norm = None
         self.norm = nn.LayerNorm(self.out_dim, elementwise_affine=True)
@@ -606,9 +606,9 @@ class Regressor(nn.Module):
         return self.regressor(graph_x), top_k_weights, top_k_indices
 
 
-class SemanticAttentionBatched(nn.Module):
+class InterAttentionBatched(nn.Module):
     def __init__(self, num_relations, in_dim, dim_a, out_dim=1, dropout=0.):
-        super(SemanticAttentionBatched, self).__init__()
+        super(InterAttentionBatched, self).__init__()
         self.num_relations = num_relations
         self.in_dim = in_dim
         self.out_dim = out_dim

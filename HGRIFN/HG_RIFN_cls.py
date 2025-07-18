@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
-class GraphClassifier(nn.Module):
+class HGraphClassifier(nn.Module):
     def __init__(
             self,
             num_gnn_layers=1,
@@ -30,7 +30,7 @@ class GraphClassifier(nn.Module):
             dropout=0.,
             activation=None
     ):
-        super(GraphClassifier, self).__init__()
+        super(HGraphClassifier, self).__init__()
         self.num_gnn_layers = num_gnn_layers
         self.num_coder_layers = num_coder_layers
         self.relations = relations
@@ -46,7 +46,7 @@ class GraphClassifier(nn.Module):
         self.autoEncoder = AutoEncoder(num_layers=self.num_coder_layers, feat_dim=self.feat_dim,
                                        embed_dim=self.embed_dim, activation=self.activation)
 
-        self.embedder = MuxGNNGraph(
+        self.embedder = IntraGraph(
             gnn_type=self.gnn_type,
             num_gnn_layers=self.num_gnn_layers,
             relations=self.relations,
@@ -471,7 +471,7 @@ class AutoEncoder(nn.Module):
         return h, encode, feat     # h, encode, feat, (top_k_nodes, top_k_relations, top_k_attention_weights)
 
 
-class MuxGNNGraph(nn.Module):
+class IntraGraph(nn.Module):
     def __init__(
             self,
             gnn_type,
@@ -482,7 +482,7 @@ class MuxGNNGraph(nn.Module):
             dropout=0.,
             activation=None
     ):
-        super(MuxGNNGraph, self).__init__()
+        super(IntraGraph, self).__init__()
         self.num_gnn_layers = num_gnn_layers
         self.relations = relations
         self.num_relations = len(self.relations)
@@ -492,13 +492,13 @@ class MuxGNNGraph(nn.Module):
         self.dropout = dropout
 
         self.layers = nn.ModuleList(
-            [MuxGNNLayer(relations=self.relations, in_dim=self.embed_dim, out_dim=self.dim_a, dim_a=self.dim_a,
-                         dropout=self.dropout, activation=self.activation)]
+            [IntraLayer(relations=self.relations, in_dim=self.embed_dim, out_dim=self.dim_a, dim_a=self.dim_a,
+                        dropout=self.dropout, activation=self.activation)]
         )
         for _ in range(1, self.num_gnn_layers):
             self.layers.append(
-                MuxGNNLayer(relations=self.relations, in_dim=self.dim_a, out_dim=self.dim_a, dim_a=self.dim_a,
-                            dropout=self.dropout, activation=self.activation)
+                IntraLayer(relations=self.relations, in_dim=self.dim_a, out_dim=self.dim_a, dim_a=self.dim_a,
+                           dropout=self.dropout, activation=self.activation)
             )
 
         self.alpha = nn.Parameter(torch.ones(self.num_gnn_layers - 1))        # 残差连接中可学习的参数 alpha
@@ -538,7 +538,7 @@ class MuxGNNGraph(nn.Module):
         return h, attention_weights
 
 
-class MuxGNNLayer(nn.Module):
+class IntraLayer(nn.Module):
     def __init__(
             self,
             relations,
@@ -549,7 +549,7 @@ class MuxGNNLayer(nn.Module):
             activation=None,
             use_autoencoder=True,  # 使用自编码器的标志
     ):
-        super(MuxGNNLayer, self).__init__()
+        super(IntraLayer, self).__init__()
         self.relations = relations
         self.num_relations = len(self.relations)
         self.use_autoencoder = use_autoencoder
@@ -571,7 +571,7 @@ class MuxGNNLayer(nn.Module):
                 allow_zero_in_degree=True
             )
 
-        self.attention = SemanticAttentionBatched(self.num_relations, self.out_dim, self.dim_a, dropout=dropout)
+        self.attention = InterAttentionBatched(self.num_relations, self.out_dim, self.dim_a, dropout=dropout)
 
         # self.norm = None
         self.norm = nn.LayerNorm(self.out_dim, elementwise_affine=True)
@@ -649,9 +649,9 @@ class BinaryClassifier(nn.Module):
         return self.classifier(graph_x), top_k_weights, top_k_indices, self.relu_features
 
 
-class SemanticAttentionBatched(nn.Module):
+class InterAttentionBatched(nn.Module):
     def __init__(self, num_relations, in_dim, dim_a, out_dim=1, dropout=0.):
-        super(SemanticAttentionBatched, self).__init__()
+        super(InterAttentionBatched, self).__init__()
         self.num_relations = num_relations
         self.in_dim = in_dim
         self.out_dim = out_dim
