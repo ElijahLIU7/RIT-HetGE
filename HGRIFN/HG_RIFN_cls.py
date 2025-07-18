@@ -1,46 +1,36 @@
 import csv
 import logging
 import os
-import sys
-import re
-import optuna
-import dgl
 import torch
 import torch.nn.functional as F
 import pandas as pd
 import matplotlib.pyplot as plt
-import random
 import seaborn as sns
 from sklearn.manifold import TSNE
 import numpy as np
 
 from time import time
 from dgl.dataloading import GraphDataLoader
-from dgl.transforms import GDC
-from dgl.nn.pytorch import GATConv, GINConv, GraphConv, SumPooling, HGTConv, GlobalAttentionPooling
+from dgl.nn.pytorch import GraphConv, GlobalAttentionPooling
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix, roc_auc_score
 from torch import nn, optim
 from torch.utils.data import DataLoader
-from torch_geometric.graphgym import SAGEConv
 from tqdm import tqdm
-from protein.pyHGT.conv import HGTConv as HGT
 
 
 class GraphClassifier(nn.Module):
     def __init__(
             self,
-            gnn_type,
-            num_gnn_layers,
-            num_coder_layers,
-            relations,
-            feat_dim,
-            embed_dim,
-            dim_a,
+            num_gnn_layers=1,
+            num_coder_layers=1,
+            relations=6,
+            feat_dim=572,
+            embed_dim=32,
+            dim_a=6,
             dropout=0.,
             activation=None
     ):
         super(GraphClassifier, self).__init__()
-        self.gnn_type = gnn_type
         self.num_gnn_layers = num_gnn_layers
         self.num_coder_layers = num_coder_layers
         self.relations = relations
@@ -71,8 +61,8 @@ class GraphClassifier(nn.Module):
         feat = graph.ndata['emb'].float()  # message passing only supports float dtypes
         # embed, (top_k_nodes, top_k_relations) = self.embedder(graph, feat)
         feat, embed, decoded = self.autoEncoder(feat)
-        embed, attention_weights = self.embedder(graph, embed)
-        class_Tm, top_k_weights, top_k_indices, graph_x = self.classifier(graph, embed)
+        embeded, attention_weights = self.embedder(graph, embed)
+        class_Tm, top_k_weights, top_k_indices, graph_x = self.classifier(graph, embeded)
         top_k_attention_weights = attention_weights[top_k_indices]
         return class_Tm, (top_k_indices, top_k_attention_weights, top_k_weights), graph_x, feat, decoded
 
@@ -493,7 +483,6 @@ class MuxGNNGraph(nn.Module):
             activation=None
     ):
         super(MuxGNNGraph, self).__init__()
-        self.gnn_type = gnn_type
         self.num_gnn_layers = num_gnn_layers
         self.relations = relations
         self.num_relations = len(self.relations)
@@ -502,18 +491,14 @@ class MuxGNNGraph(nn.Module):
         self.activation = activation
         self.dropout = dropout
 
-        self.layers = nn.ModuleList()
-        for _ in range(self.num_gnn_layers):
+        self.layers = nn.ModuleList(
+            [MuxGNNLayer(relations=self.relations, in_dim=self.embed_dim, out_dim=self.dim_a, dim_a=self.dim_a,
+                         dropout=self.dropout, activation=self.activation)]
+        )
+        for _ in range(1, self.num_gnn_layers):
             self.layers.append(
-                MuxGNNLayer(
-                    gnn_type=self.gnn_type,
-                    relations=self.relations,
-                    in_dim=self.embed_dim,
-                    out_dim=self.embed_dim,
-                    dim_a=self.dim_a,
-                    dropout=self.dropout,
-                    activation=self.activation,
-                )
+                MuxGNNLayer(relations=self.relations, in_dim=self.dim_a, out_dim=self.dim_a, dim_a=self.dim_a,
+                            dropout=self.dropout, activation=self.activation)
             )
 
         self.alpha = nn.Parameter(torch.ones(self.num_gnn_layers - 1))        # 残差连接中可学习的参数 alpha
@@ -528,6 +513,9 @@ class MuxGNNGraph(nn.Module):
             act_fn = nn.ELU()
         elif activation == 'gelu':
             act_fn = nn.GELU()
+        elif activation == 'softmax':
+            # Softmax requires specifying the dimension to apply it to
+            act_fn = nn.Softmax(dim=-1)
         else:
             raise ValueError('Invalid activation function.')
 
@@ -553,7 +541,6 @@ class MuxGNNGraph(nn.Module):
 class MuxGNNLayer(nn.Module):
     def __init__(
             self,
-            gnn_type,
             relations,
             in_dim,
             out_dim,
@@ -563,7 +550,6 @@ class MuxGNNLayer(nn.Module):
             use_autoencoder=True,  # 使用自编码器的标志
     ):
         super(MuxGNNLayer, self).__init__()
-        self.gnn_type = gnn_type
         self.relations = relations
         self.num_relations = len(self.relations)
         self.use_autoencoder = use_autoencoder
@@ -575,13 +561,7 @@ class MuxGNNLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.activation = self._get_activation_fn(self.act_str)
 
-        if self.gnn_type == 'hgtconv':
-            self.num_heads = 8
-            self.head_size = self.out_dim / self.num_heads
-            self.num_etypes = self.num_relations
-            self.num_ntypes = 1
-        if self.gnn_type == 'gcn':
-            self.gnn = GraphConv(
+        self.gnn = GraphConv(
                 in_feats=self.in_dim,
                 out_feats=self.out_dim,
                 norm='both',
@@ -590,61 +570,11 @@ class MuxGNNLayer(nn.Module):
                 activation=self.activation,
                 allow_zero_in_degree=True
             )
-        elif self.gnn_type == 'gat':
-            self.gnn = GATConv(
-                in_feats=self.in_dim,
-                out_feats=self.out_dim,
-                num_heads=4,
-                feat_drop=dropout,
-                residual=False,
-                activation=self.activation,
-                allow_zero_in_degree=True
-            )
-        elif self.gnn_type == 'gin':
-            self.gnn = GINConv(
-                apply_func=nn.Sequential(
-                    nn.Linear(self.in_dim, self.out_dim),
-                    self.dropout,
-                    self.activation,
-                    nn.Linear(self.out_dim, self.out_dim),
-                    self.dropout,
-                    self.activation,
-                ),
-                aggregator_type='mean',
-            )
-        elif self.gnn_type == 'sage':
-            self.gnn = SAGEConv(
-                in_feats=self.in_dim,
-                out_feats=self.out_dim,
-                aggregator_type='pool',
-                feat_drop=dropout,
-                activation=self.activation
-            )
-        elif self.gnn_type == 'hgt':
-            self.gnn = HGT(
-                in_dim=self.in_dim,
-                out_dim=self.out_dim,
-                num_types=1,
-                num_relations=self.relations,
-                n_heads=2,
-                dropout=dropout,
-                use_norm=True
-            )
-        elif self.gnn_type == 'hgtconv':
-            self.gnn = HGTConv(
-                in_size=self.in_dim,
-                head_size=self.head_size,
-                num_heads=self.num_heads,
-                num_etypes=self.num_etypes,
-                num_ntypes=self.num_ntypes,
-                dropout=self.dropout,
-                use_norm=True
-            )
 
         self.attention = SemanticAttentionBatched(self.num_relations, self.out_dim, self.dim_a, dropout=dropout)
 
         # self.norm = None
-        self.norm = nn.LayerNorm(self.out_dim, elementwise_affine=True)  # 仿射变换
+        self.norm = nn.LayerNorm(self.out_dim, elementwise_affine=True)
         # self.norm = nn.BatchNorm1d(self.num_relations)
 
     @staticmethod
@@ -661,6 +591,9 @@ class MuxGNNLayer(nn.Module):
             act_fn = nn.Tanh()
         elif activation == 'selu':
             act_fn = nn.SELU()
+        elif activation == 'softmax':
+            # Softmax requires specifying the dimension to apply it to
+            act_fn = nn.Softmax(dim=-1)
         else:
             raise ValueError('Invalid activation function.')
 
@@ -670,26 +603,9 @@ class MuxGNNLayer(nn.Module):
         h = torch.zeros(self.num_relations, graph.num_nodes(), self.out_dim, device=graph.device)
 
         with graph.local_scope():
-            if self.gnn_type == 'hgtconv':
-                h = self.gnn(graph, feat)
             for i, graph_layer in enumerate(self.relations):
                 rel_graph = graph['node', graph_layer, 'node']
-
-                if self.gnn_type == 'hgt':
-                    source_nodes, destination_nodes, edges = rel_graph.edges(form='all')
-                    edge_index = torch.stack((source_nodes, destination_nodes))
-                    edge_weights = rel_graph.edges[graph_layer].data['weight']
-                    edge_index = torch.cat((edge_index, edge_weights.T), dim=0)
-                    node_type = torch.zeros(feat.size(0)).to(feat.device)
-                    edge_type = torch.full((edge_index[0].size(0),), i, dtype=torch.long, device=rel_graph.device)
-                    edge_time = torch.zeros(edge_index[0].size(0), dtype=torch.long, device=rel_graph.device)
-                    h_out = self.gnn(feat, node_type, edge_index, edge_type, edge_time)
-                    h_out = self.layer_norm(h_out)
-                else:
-                    h_out = self.gnn(rel_graph, feat).squeeze()
-                    if self.gnn_type == 'gat':
-                        h_out = h_out.sum(dim=1)
-                    # h_out = self.layer_norm(h_out)
+                h_out = self.gnn(rel_graph, feat).squeeze()
                 h[i] = h_out
 
         if self.norm:
@@ -699,16 +615,11 @@ class MuxGNNLayer(nn.Module):
         if Is_last:
             attention_weights = self.attention.get_top_k_nodes()
             return h, attention_weights
-        # h = self.attention(graph, h, Is_attention=Is_attention)
 
         return h
 
 
 class BinaryClassifier(nn.Module):
-    """
-    二分类
-    """
-
     def __init__(self, embed_dim, top_k):
         super(BinaryClassifier, self).__init__()
         self.embed_dim = embed_dim
@@ -721,22 +632,18 @@ class BinaryClassifier(nn.Module):
             nn.ReLU(),
             nn.Linear(self.embed_dim, 1)
         )
-        # 添加特征提取相关属性
-        self.relu_features = None  # 用于存储ReLU后的特征
-        self._register_hooks()  # 注册钩子获取中间层输出
+        self.relu_features = None
+        self._register_hooks()
 
     def _register_hooks(self):
-        """注册前向钩子捕获ReLU层输出"""
 
         def hook_function(module, input, output):
             self.relu_features = output.detach().cpu()
 
-        # 获取ReLU层实例
         relu_layer = self.classifier[1]
         relu_layer.register_forward_hook(hook_function)
 
     def forward(self,graph, x):
-        # 获取 Global Attention 的结果和注意力权重
         graph_x, attention_weights = self.gap(graph, x, get_attention=True)
         top_k_weights, top_k_indices = torch.topk(attention_weights.squeeze(), self.top_k)
         return self.classifier(graph_x), top_k_weights, top_k_indices, self.relu_features
@@ -759,7 +666,7 @@ class SemanticAttentionBatched(nn.Module):
         )
 
         self.reset_parameters()
-        self.attention_weights = None  # 动态初始化
+        self.attention_weights = None
 
     def reset_parameters(self):
         gain = nn.init.calculate_gain('sigmoid')
@@ -806,24 +713,9 @@ class SemanticAttentionBatched(nn.Module):
 
     def get_top_k_nodes(self):
         return self.attention_weights
-        # # Sum attention weights across all relations to get the importance score for each node
-        # importance_scores = self.attention_weights.sum(dim=1)
-        #
-        # # Get the top k nodes
-        # top_k_scores, top_k_nodes = torch.topk(importance_scores, k)
-        #
-        # # Get the corresponding relation types for these nodes
-        # top_k_relations = self.attention_weights[top_k_nodes]
-        #
-        # # Get the corresponding attention weights for these nodes
-        # top_k_attention_weights = self.attention_weights[top_k_nodes]
-        #
-        # return top_k_nodes, top_k_relations, top_k_attention_weights
 
 
 def model_loss(original, decoded, beta=1e-3):
-    # 重构误差：计算原始输入和解码器输出之间的均方误差
     reconstruction_loss = F.mse_loss(decoded, original)
-    # 总损失 = 重构误差 + 相似性损失
     total_loss = 1e-2 * beta * reconstruction_loss
     return total_loss

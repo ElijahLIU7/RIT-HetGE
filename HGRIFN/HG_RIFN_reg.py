@@ -517,7 +517,7 @@ class MuxGNNLayer(nn.Module):
         self.attention = SemanticAttentionBatched(self.num_relations, self.out_dim, self.dim_a, dropout=dropout)
 
         # self.norm = None
-        self.norm = nn.LayerNorm(self.out_dim, elementwise_affine=True)  # 层标准化
+        self.norm = nn.LayerNorm(self.out_dim, elementwise_affine=True)
         # self.norm = nn.BatchNorm1d(self.num_relations)
 
     @staticmethod

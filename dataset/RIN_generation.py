@@ -106,7 +106,6 @@ def protein_made(args, fold_idx, folds):
         weights = {}
         node_features = {}
         node_types = {}
-        # AA_AA = {}
         Label = Tm
         """
         Based on the interaction force dimension, the protein residue nodes are embedded, 

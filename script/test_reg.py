@@ -27,7 +27,6 @@ def load_graphpred_dataset(data):
     test_name_protein = []
 
     for g, cv, lbl, nap in zip(graphs, graph_attr['cv_folds'], graph_attr['labels'], graph_attr['name_protein']):
-        # 解码字符串
         name_protein = "".join(map(chr, nap.numpy())).strip()
         if name_protein[-1] == '\x00':
             name_protein = name_protein[:-4]
@@ -93,14 +92,15 @@ def objective(trial):
      relations) = load_graphpred_dataset(data)
 
     model = GraphRegressor()
-    t_loss, t_r2, t_mae, t_pcc, name_protein, (t_top_k_nodes, t_top_k_relations, top_k_attention_weights) = model.eval_model(
+    t_loss, t_r2, t_mae, t_pcc, name_protein, (t_top_k_nodes, t_top_k_relations,
+                                               top_k_attention_weights) = model.eval_model(
         test_dataset, device=device, Is_test=True, model_load=model_dir, Is_Best_test=True
     )
 
     Tm = pd.read_csv(f'{args.input}/test_dataset.csv')
     Tm['Protein_ID'] = Tm['Protein_ID'].apply(lambda x: re.split('_|-', x)[0])
     Tm_dict = pd.Series(Tm.Tm.values, index=Tm.Protein_ID).to_dict()
-    # 定义氨基酸三字母简写和一字母简写的对应字典
+    # A dictionary defining the three-letter and one-letter abbreviations of amino acids.
     amino_acid_map = {
         'A': 'ALA',
         'R': 'ARG',
@@ -144,7 +144,7 @@ def objective(trial):
         if name[-1] == '\x00':
             name = name[:-4]
         # Read the uploaded FASTA file and calculate the length of the second line
-        fasta_file_path = f'{args.input}/FASTA/test2_dataset_fasta/{name}.fasta'
+        fasta_file_path = f'{args.input}/FASTA/test_dataset_fasta/{name}.fasta'
         # Read the file and extract the second line
         with open(fasta_file_path, 'r') as file:
             lines = file.readlines()

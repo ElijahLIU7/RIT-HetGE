@@ -4,6 +4,8 @@ import logging
 import torch
 import optuna
 import csv
+import re
+import pandas as pd
 
 from HGRIFN.HG_RIFN_reg import GraphRegressor
 from HGRIFN.utils import load_dataset, load_testDataset
@@ -14,7 +16,7 @@ def objective(trial):
     Use Optuna to optimize model parameters
     """
 
-    print('Version: HG-RIFN_regression')
+    print('Version: RIT-HetGE_regression')
     data = args.data
     model_name = f'regression_{data}'
     # Defined in the hyperparameter search space
@@ -33,7 +35,7 @@ def objective(trial):
 
     args.cuda = torch.cuda.is_available() and args.cuda
     device = torch.device('cuda' if args.cuda else 'cpu')
-    out_model_dir = f'{args.output}/Best_{model_name}_result'
+    out_model_dir = f'{args.results}/Best_{model_name}_result'
     os.makedirs(out_model_dir, exist_ok=True)
     # for Lambda1 in [0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]:
     Lambda1 = 1
@@ -126,7 +128,7 @@ def objective(trial):
 
         test_dataset = load_testDataset(args.results, is_CNN=True)
         t_loss, t_r2, t_mae, t_pcc, name_protein, (
-        t_top_k_nodes, t_top_k_relations, top_k_attention_weights) = model.eval_model(
+            t_top_k_nodes, t_top_k_relations, top_k_attention_weights) = model.eval_model(
             test_dataset, batch_size=1, num_workers=args.num_workers, device=device, Is_test=True,
             model_load=out_model_dir, Is_Best_test=True
         )
@@ -150,24 +152,56 @@ def objective(trial):
             )
 
         # Test set K-top
-        output_dir = f'{args.results}/{data}/Graph_top_k'
+        amino_acid_map = {
+            'A': 'ALA',
+            'R': 'ARG',
+            'N': 'ASN',
+            'D': 'ASP',
+            'Q': 'GLN',
+            'E': 'GLU',
+            'G': 'GLY',
+            'H': 'HIS',
+            'L': 'LEU',
+            'M': 'MET',
+            'F': 'PHE',
+            'P': 'PRO',
+            'S': 'SER',
+            'T': 'THR',
+            'W': 'TRP',
+            'Y': 'TYR',
+            'V': 'VAL',
+            'K': 'LYS',
+            'I': 'ILE',
+            'C': 'CYS'
+        }
+        output_dir = f'{args.results}/Test_Graph_top_k'
         os.makedirs(output_dir, exist_ok=True)
+        Tm = pd.read_csv(f'data/HRIN-ProTstab/test_dataset.csv')
+        # Extract the content before the "_" in the Protein_ID column
+        Tm['Protein_ID'] = Tm['Protein_ID'].apply(lambda x: re.split('_|-', x)[0])
+        Tm_dict = pd.Series(Tm.Tm.values, index=Tm.Protein_ID).to_dict()
         for name, nodes, relations, weights in zip(name_protein, t_top_k_nodes, t_top_k_relations,
                                                    top_k_attention_weights):
             if name[-1] == '\x00':
                 name = name[:-4]
-            output_csv = os.path.join(output_dir, f'protein_{name}_nodes_relations.csv')
+            # Read the uploaded FASTA file and calculate the length of the second line
+            fasta_file_path = f'{args.input}/FASTA/test_dataset_fasta/{name}.fasta'
+            # Read the file and extract the second line
+            with open(fasta_file_path, 'r') as file:
+                lines = file.readlines()
+                sequence = lines[1].strip()
+            output_csv = os.path.join(output_dir, f'graph_{name}_nodes_relations_Tm-{Tm_dict[name]}.csv')
             with open(output_csv, 'w', newline='') as csvfile:
                 csvwriter = csv.writer(csvfile)
                 csvwriter.writerow(
-                    ['Node', 'VDW', 'PIPISTACK', 'HBOND', 'IONIC', 'SSBOND', 'PICATION',
-                     'WEIGHT'])  # Assuming 6 relations per node
+                    ['Node', 'Residue', 'VDW', 'PIPISTACK', 'HBOND', 'IONIC', 'SSBOND',
+                     'PICATION', 'weight'])  # Assuming 6 relations per node
                 for node, relation, weight in zip(nodes, relations, weights):
-                    csvwriter.writerow([node] + relation + [weight])
+                    residue = amino_acid_map[sequence[node]]
+                    csvwriter.writerow([node + 1, residue] + relation + [weight])
 
-        csv_file = f'{data}/fold_optuna_results_regression.csv'
+        csv_file = f'{args.results}/fold_optuna_results_regression.csv'
         os.makedirs(args.results, exist_ok=True)
-        csv_file = os.path.join(args.model_dir, csv_file)
         fieldnames = ['Fold', 'model_name', 'data_dir', 'dataset', 'gnn', 'num_gcn_layer', 'embed_dim', 'dim_a',
                       'dropout', 'activation', 'batch_size', 'epochs', 'lr', 'weight_decay', 'accum_steps',
                       'Best_Valid_Loss(MSE)', 'Valid_R2', 'Valid_MAE', 'Valid_PCC', 'Test_Loss(MSE)', 'Test_R2',
@@ -181,7 +215,6 @@ def objective(trial):
             writer.writerow({
                 'Fold': cv_fold,
                 'model_name': model_name,
-                'data_dir': args.output,
                 'num_gcn_layer': num_gcn_layer,
                 'embed_dim': embed_dim,
                 'dim_a': dim_a,
@@ -208,11 +241,13 @@ def objective(trial):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=str, default='data/HRIN-ProTstab/')
-    parser.add_argument('--results', type=str, default='./results/HRIN-ProTstab',)
+    parser.add_argument('--results', type=str, default='./results/HRIN-ProTstab/regression/', )
     parser.add_argument('--data', type=str, default='HRIN-ProTstab')
     parser.add_argument('--n_trials', type=int, default=20,
                         help='Number of trial runs.')
     parser.add_argument('--cuda', type=bool, default=True, help='cuda or not.')
+    parser.add_argument('--num_workers', type=int, default=0,
+                        help='Number of worker processes.')
 
     args = parser.parse_args()
 
