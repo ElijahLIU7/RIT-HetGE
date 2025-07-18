@@ -10,7 +10,7 @@ import dgl
 import pandas as pd
 
 from dgl.data import DGLDataset
-from HGRIFN.HG_RIFN_reg import HGraphRegressor
+from HGRIFN.HG_RIFN_cls import HGraphClassifier
 
 
 def load_graphpred_dataset(data):
@@ -24,6 +24,8 @@ def load_graphpred_dataset(data):
     test_graphs = []
     test_labels = []
     test_name_protein = []
+
+    graph_attr['labels'] = (graph_attr['labels'] >= 60).int()
 
     for g, cv, lbl, nap in zip(graphs, graph_attr['cv_folds'], graph_attr['labels'], graph_attr['name_protein']):
         name_protein = "".join(map(chr, nap.numpy())).strip()
@@ -68,9 +70,9 @@ def objective(trial):
     """
     Optimize the model parameters using optuna
     """
-    print('Version: HG-RIFN_regression_test')
+    print('Version: HG-RIFN_classification_test')
     data = args.data
-    model_name = f'regression_{data}_test'
+    model_name = f'classification_{data}_test'
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_dir = f'{args.results}/Best_{model_name}_result'
@@ -90,10 +92,11 @@ def objective(trial):
      feat_dim,
      relations) = load_graphpred_dataset(data)
 
-    model = HGraphRegressor()
-    t_loss, t_r2, t_mae, t_pcc, name_protein, (t_top_k_nodes, t_top_k_relations,
-                                               top_k_attention_weights) = model.eval_model(
-        test_dataset, device=device, Is_test=True, model_load=model_dir, Is_Best_test=True
+    model = HGraphClassifier()
+    t_acc, t_p, t_r, t_f1, t_auc, name_protein, (t_top_k_nodes, t_top_k_relations,
+                                                 top_k_attention_weights) = model.eval_model(
+        test_dataset, batch_size=1, num_workers=args.num_workers, device=device, Is_test=True,
+        model_load=model_dir, Is_Best_test=False
     )
 
     Tm = pd.read_csv(f'{args.input}/test_dataset.csv')
@@ -128,16 +131,17 @@ def objective(trial):
         f.write(
             '\n'.join(
                 ('-' * 25,
-                 f'Test Loss: {t_loss}',
-                 f'Test R2: {t_r2}',
-                 f'Test MAE: {t_mae}',
-                 f'Test PCC: {t_pcc}',
+                 f'Test Accuracies: {t_acc}',
+                 f'Test Precisions: {t_p}',
+                 f'Test Recalls: {t_r}',
+                 f'Test F1s: {t_f1}',
+                 f'Test AUCs:{t_auc}',
                  '-' * 25 + '\n')
             )
         )
 
     # Test set K-top
-    output_dir = f'{args.results}/regression/Test_Graph_top_k'
+    output_dir = f'{args.results}/classification/Test_Graph_top_k'
     os.makedirs(output_dir, exist_ok=True)
     for name, nodes, relations, weights in zip(name_protein, t_top_k_nodes, t_top_k_relations, top_k_attention_weights):
         if name[-1] == '\x00':
@@ -158,14 +162,14 @@ def objective(trial):
                 residue = amino_acid_map[sequence[node]]
                 csvwriter.writerow([node + 1, residue] + relation + [weight])
 
-    return t_loss
+    return t_acc
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--input', type=str, default='data/HRIN-ProTstab/')
-    parser.add_argument('--results', type=str, default='./results/HRIN-ProTstab/regression', )
+    parser.add_argument('--results', type=str, default='./results/HRIN-ProTstab/classification', )
     parser.add_argument('--data', type=str, default='HRIN-ProTstab')
     parser.add_argument('--cuda', type=bool, default=True, help='cuda or not.')
 

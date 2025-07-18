@@ -36,12 +36,12 @@ python script/main_cls.py  [--input] [--results] [--data] [n_trials] [--cuda]
 ```
 Run the test_cls.py file, which is the main script file used to ***test*** the saved optimal protein thermal stability **regression** model. The following options are supported:
 ```bash
-python script/test_reg.py 
+python script/test_reg.py [--input] [--results] [--data] [--cuda]
 ```
 
 Run the test_cls.py file, which is the main script file used to ***test*** the saved optimal protein thermal stability **classification** model. The following options are supported:
 ```bash
-python script/test_cls.py 
+python script/test_cls.py [--input] [--results] [--data] [--cuda]
 ```
 
 ## Cite

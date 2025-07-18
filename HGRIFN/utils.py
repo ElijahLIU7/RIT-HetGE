@@ -22,13 +22,11 @@ def load_testDataset(dataset, is_classification=False, is_CNN=False):
     test_name_protein = []
     adjacency_matrices = []
 
-    # 二值化标签：b大于等于60的设置为1，否则设置为0
+    # Binarized labels: Set to 1 if b is greater than or equal to 60, and set to 0 otherwise.
     if is_classification:
         graph_attr['labels'] = (graph_attr['labels'] >= 60).int()
 
     for g, cv, lbl, nap in zip(graphs, graph_attr['cv_folds'], graph_attr['labels'], graph_attr['name_protein']):
-        # 解码字符串
-        # 解码字符串
         name_protein = "".join(map(chr, nap.numpy())).strip()
         if name_protein[-1] == '\x00':
             name_protein = name_protein[:-4]
@@ -37,10 +35,8 @@ def load_testDataset(dataset, is_classification=False, is_CNN=False):
         test_name_protein.append(name_protein)
 
         if is_CNN:
-            # 获取图中的节点数量
             num_nodes = g.num_nodes()
 
-            # 用稀疏矩阵构建邻接矩阵
             indices_list = []
             values_list = []
 
@@ -49,16 +45,13 @@ def load_testDataset(dataset, is_classification=False, is_CNN=False):
                 weights = g.edges[etype].data['weight']
                 rel_idx = relation_to_index[etype]
 
-                # 收集稀疏矩阵的索引和对应值
                 rel_indices = torch.stack([torch.full_like(src, rel_idx), src, dst], dim=0)  # [3, num_edges]
                 indices_list.append(rel_indices)
                 values_list.append(weights)
 
-            # 合并所有关系的索引和权重
-            indices = torch.cat(indices_list, dim=1)  # [3, total_edges]
-            values = torch.cat(values_list, dim=0).squeeze()  # [total_edges]
+            indices = torch.cat(indices_list, dim=1)
+            values = torch.cat(values_list, dim=0).squeeze()
 
-            # 创建稀疏张量
             adj_matrix = torch.sparse_coo_tensor(indices, values, size=(6, num_nodes, num_nodes))
             adjacency_matrices.append(adj_matrix)
 
