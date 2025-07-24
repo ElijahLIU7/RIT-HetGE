@@ -1,9 +1,9 @@
 # Residue Interaction Type-Aware Heterogeneous Graph Embedding model (RIT-HetGE)
 
-![Architecture of the Heterogeneous Graph Protein Residue Interaction Fusion Network model (HG-RIFN)](framwork.jpg)
+![Architecture of the Heterogeneous Graph Protein Residue Interaction Fusion Network model (RIN-HetGE)](framwork.jpg)
 ## Overview
 
-In this project, we provide a specific implementation of HG-RIFN in Pytorch. The organizational structure of this code repository is as follows:
+In this project, we provide a specific implementation of RIN-HetGE in Pytorch. The organizational structure of this code repository is as follows:
 
 + ```EXP/``` stores all baseline algorithms for solving graph classification and regression problems, such as GCN.py (GCN code), DHNE.py (DHNE code) and so on.
 

@@ -68,7 +68,7 @@ def objective(trial):
     """
     Optimize the model parameters using optuna
     """
-    print('Version: HG-RIFN_regression_test')
+    print('Version: RIN-HetGE_regression_test')
     data = args.data
     model_name = f'regression_{data}_test'
 
