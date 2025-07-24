@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import dgl
 import pandas as pd
+from numpy.ma.core import masked
 
 from tqdm import tqdm
 from multiprocessing import Pool
@@ -106,6 +107,7 @@ def protein_made(args, fold_idx, folds):
         weights = {}
         node_features = {}
         node_types = {}
+        posAndPos = []
         Label = Tm
         """
         Based on the interaction force dimension, the protein residue nodes are embedded, 
@@ -189,11 +191,20 @@ def protein_made(args, fold_idx, folds):
                         _graph[(type, force_type, re_type)] = (torch.tensor([position]), torch.tensor([re_position]))
                         weights[(type, force_type, re_type)] = torch.tensor([edge_distance])
                     else:
-                        _graph[(type, force_type, re_type)] = (
-                            torch.cat([_graph[(type, force_type, re_type)][0], torch.tensor([position])]),
-                            torch.cat([_graph[(type, force_type, re_type)][1], torch.tensor([re_position])]))
-                        weights[(type, force_type, re_type)] = torch.cat(
-                            [weights[(type, force_type, re_type)], torch.tensor([edge_distance])])
+                        if (position, re_position) in posAndPos:
+                            mask1 = _graph[(type, force_type, re_type)][0] == position
+                            mask2 = _graph[(type, force_type, re_type)][1] == re_position
+                            mask = mask1 & mask2
+                            matching_positions = mask.nonzero().squeeze().tolist()
+                            weights[(type, force_type, re_type)][matching_positions] += torch.tensor(edge_distance)
+                        else:
+                            _graph[(type, force_type, re_type)] = (
+                                torch.cat([_graph[(type, force_type, re_type)][0], torch.tensor([position])]),
+                                torch.cat([_graph[(type, force_type, re_type)][1], torch.tensor([re_position])]))
+                            weights[(type, force_type, re_type)] = torch.cat(
+                                [weights[(type, force_type, re_type)], torch.tensor([edge_distance])])
+                            posAndPos.append((position, re_position))
+
 
         graph = dgl.heterograph(_graph)
         for ntype in set(node_types.values()):
