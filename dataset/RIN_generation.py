@@ -121,7 +121,7 @@ def protein_made(args, fold_idx, folds):
 
         pssm_file_path = f'data/HRIN-ProTstab/PSSM/{args.struction_type}_pssm/{tmpTy}.pssm'
         pssm_matrix = read_pssm(pssm_file_path, max_position)
-        position_encodings = {i: compute_position_encoding(i, max_position, 572) for i in range(max_position)}
+        position_encodings = {i: compute_position_encoding(i, 572) for i in range(max_position)}
 
         for force_type in force_types:
             filename = '%s.csv' % tmpTy
@@ -158,6 +158,9 @@ def protein_made(args, fold_idx, folds):
                         pssm = pssm.tolist()
                         # protein_index = aaindex     # non-pssm for ablation
                         # protein_index = pssm        # non-aaindex for ablation
+                        aaindex_array = np.array(aaindex, dtype=np.float32)
+                        aaindex = (aaindex_array - np.mean(aaindex_array)) / (np.std(aaindex_array) + 1e-7)
+                        aaindex = aaindex.tolist()
                         protein_index = pssm
                         protein_index += aaindex
                         # non-position for ablation
@@ -170,6 +173,9 @@ def protein_made(args, fold_idx, folds):
                         re_pssm = re_pssm.tolist()
                         # re_protein_index = re_aaindex  # non-pssm for ablation
                         # re_protein_index = re_pssm  # non-aaindex for ablation
+                        re_aaindex_array = np.array(aaindex, dtype=np.float32)
+                        re_aaindex = (re_aaindex_array - np.mean(re_aaindex_array)) / (np.std(re_aaindex_array) + 1e-7)
+                        re_aaindex = re_aaindex.tolist()
                         re_protein_index = re_pssm
                         re_protein_index += re_aaindex
                         # non-position for ablation
@@ -288,15 +294,15 @@ def get_hnet(str_type, char):
 
 
 # Pre-calculate the constant part of max_position
-def compute_position_encoding(position, max_position, dimension):
+def compute_position_encoding(position, dimension):
     position_encoding = torch.zeros(dimension)
     for i in range(dimension):
         if i % 2 == 0:
             position_encoding[i] = torch.sin(
-                torch.tensor((position + 1) / (10000 ** (2 * (i // 2) / max_position)), dtype=torch.float32))
+                torch.tensor((position) / (10000 ** (2 * (i // 2) / dimension)), dtype=torch.float32))
         else:
             position_encoding[i] = torch.cos(
-                torch.tensor((position + 1) / (10000 ** (2 * (i // 2) / max_position)), dtype=torch.float32))
+                torch.tensor((position) / (10000 ** (2 * (i // 2) / dimension)), dtype=torch.float32))
     return position_encoding
 
 
