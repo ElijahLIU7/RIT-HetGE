@@ -182,7 +182,7 @@ class HGraphClassifier(nn.Module):
                     print(f"Early stopping at epoch {epoch + 1}/{EPOCHS}")
                     break
 
-                torch.cuda.empty_cache()  # 清理显存
+                torch.cuda.empty_cache()
 
         end_train = time()
         logging.info(f'Total training time... {end_train - start_train:.2f}s')
@@ -237,10 +237,10 @@ class HGraphClassifier(nn.Module):
         self.plot_tsne(embeddings, y_true, y_pred)
 
         if Is_test:
-            # 输出每个蛋白质的真实标签和预测标签
+            # Output the true label and predicted label for each protein.
             protein_results = list(zip(name_protein, y_true, y_pred))
 
-            # 打开一个 CSV 文件并设置写入模式
+            # Open a CSV file and set the write mode.
             output_dir = model_load
             os.makedirs(output_dir, exist_ok=True)
             with open('protein_results.csv', mode='w', newline='') as file:
@@ -249,16 +249,15 @@ class HGraphClassifier(nn.Module):
                 # 写入CSV文件的表头
                 writer.writerow(['Protein', 'True Tm', 'Predicted Tm'])
 
-                # 遍历 protein_results，将数据写入 CSV
+                # Iterate through protein_results and write the data to CSV.
                 for name, true_label, pred_label in protein_results:
-                    # 检查是否有结束符 \x00，并去除
+                    # Check for the null terminator \x00 and remove it.
                     if name[-1] == '\x00':
                         name = name[:-4]
 
-                    # 打印输出
                     print(f'Protein: {name}, True Tm: {true_label}, Predicted Tm: {pred_label}')
 
-                    # 将数据写入CSV文件
+                    # Write data to a CSV file
                     writer.writerow([name, true_label, pred_label])
 
             # Tm = pd.read_csv(f'F:/dataset/protein/test2_dataset.csv')
@@ -270,7 +269,6 @@ class HGraphClassifier(nn.Module):
             # Tm_55_65_correct = 0
             # all = 0
             #
-            # # 用于绘制图像的列表
             # correct_predictions = []
             # incorrect_predictions = []
             #
@@ -292,23 +290,19 @@ class HGraphClassifier(nn.Module):
             #         if 50 <= Tm_dict[name] <= 70:
             #             Tm_55_65_correct += 1
             #
-            # # 绘制图像
             # plt.figure(figsize=(12, 6))
             # plt.title('Predictions vs. True Labels')
             # plt.xlabel('Protein')
             # plt.ylabel('Temperature (Tm)')
             #
-            # # 将正确和错误预测的节点合并成一个列表
             # all_points = correct_predictions + incorrect_predictions
             #
-            # # 随机选取节点进行绘制
             # if all_points:
             #     tmp = random.sample(all_points, len(all_points))
             #     names, temps = zip(*tmp)
             #     colors = ['red' if point in correct_predictions else 'blue' for point in tmp]
             #     plt.scatter(names, temps, color=colors, marker='o')
             #
-            # # 绘制温度虚线
             # plt.axhline(y=60, color='gray', linestyle='--', label='Tm = 60°C')
             # plt.axhline(y=70, color='green', linestyle='--', label='Tm = 70°C')
             # plt.axhline(y=50, color='green', linestyle='--', label='Tm = 50°C')
@@ -416,10 +410,10 @@ class AutoEncoder(nn.Module):
         self.feat_dim = feat_dim
         self.embed_dim = embed_dim
         self.activation = activation
-        self.noise_std = noise_std  # 保存噪声标准差
+        self.noise_std = noise_std  # Preserve noise standard deviation
         self.encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
-        # 自编码器初始化
+        # Autoencoder Initialization
         tmp = []
         tmp.append(self.feat_dim)
         for i in range(num_layers):
@@ -458,7 +452,7 @@ class AutoEncoder(nn.Module):
 
     def forward(self, feat):     # (self, graph, feat, embedder):
         h = feat
-        # 在初始阶段对每个节点加入高斯白噪声
+        # Add Gaussian white noise to each node during the initial phase.
         noise = torch.randn_like(feat) * self.noise_std
         feat = feat + noise
         for i, layer in enumerate(self.encoder):
@@ -501,7 +495,7 @@ class IntraGraph(nn.Module):
                            dropout=self.dropout, activation=self.activation)
             )
 
-        self.alpha = nn.Parameter(torch.ones(self.num_gnn_layers - 1))        # 残差连接中可学习的参数 alpha
+        self.alpha = nn.Parameter(torch.ones(self.num_gnn_layers - 1))        # The learnable parameter alpha in residual connections
 
     @staticmethod
     def _get_activation_fn(activation):
@@ -524,7 +518,7 @@ class IntraGraph(nn.Module):
     def forward(self, graph, feat):
         h = feat
 
-        alpha = torch.sigmoid(self.alpha)  # 将 alpha 值约束在[0,1]之间
+        alpha = torch.sigmoid(self.alpha)  # Constrain the alpha value between [0,1].
         for i, layer in enumerate(self.layers):
             if i == self.num_gnn_layers - 1:
                 h_new, attention_weights = layer(graph, h, Is_attention=True,  Is_last=True)
@@ -547,7 +541,7 @@ class IntraLayer(nn.Module):
             dim_a,
             dropout=0.,
             activation=None,
-            use_autoencoder=True,  # 使用自编码器的标志
+            use_autoencoder=True,
     ):
         super(IntraLayer, self).__init__()
         self.relations = relations

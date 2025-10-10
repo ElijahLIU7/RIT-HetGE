@@ -402,7 +402,7 @@ class AutoEncoder(nn.Module):
 
     def forward(self, feat):
         h = feat
-        # 在初始阶段对每个节点加入高斯白噪声
+        # Add Gaussian white noise to each node during the initial phase.
         noise = torch.randn_like(feat) * self.noise_std
         feat = feat + noise
         for i, layer in enumerate(self.encoder):
@@ -444,7 +444,7 @@ class IntraGraph(nn.Module):
                            dropout=self.dropout, activation=self.activation)
             )
 
-        self.alpha = nn.Parameter(torch.ones(self.num_gnn_layers - 1))  # 残差连接中可学习的参数 alpha
+        self.alpha = nn.Parameter(torch.ones(self.num_gnn_layers - 1))  # The learnable parameter alpha in residual connections
 
     @staticmethod
     def _get_activation_fn(activation):
@@ -467,7 +467,7 @@ class IntraGraph(nn.Module):
     def forward(self, graph, feat):
         h = feat
 
-        alpha = torch.sigmoid(self.alpha)  # 将 alpha 值约束在[0,1]之间
+        alpha = torch.sigmoid(self.alpha)  # Constrain the alpha value between [0,1].
         for i, layer in enumerate(self.layers):
             if i == self.num_gnn_layers - 1:
                 h_new, attention_weights = layer(graph, h, Is_attention=True, Is_last=True)
@@ -490,7 +490,7 @@ class IntraLayer(nn.Module):
             dim_a,
             dropout=0.,
             activation=None,
-            use_autoencoder=True,  # 使用自编码器的标志
+            use_autoencoder=True,  # Flags for using autoencoders
     ):
         super(IntraLayer, self).__init__()
         self.relations = relations
