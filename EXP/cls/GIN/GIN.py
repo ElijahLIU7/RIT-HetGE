@@ -9,7 +9,7 @@ from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_sco
 import logging
 import os
 import numpy as np
-from protein_wang.pyHGT.utils_homogeneous_classify import load_graphpred_dataset, load_graphpred_testDataset
+from HGRIFN.utils import load_dataset, load_testDataset
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
@@ -203,7 +203,7 @@ def cross_validation(dataset_path, CV_FOLDS=10, epochs=50, lr=0.1, batch_size=8,
         print(f"Running fold {cv_select + 1}/{CV_FOLDS}...")
 
         # 加载数据集，根据当前折数选择训练集和验证集
-        train_dataset, valid_dataset, feat_dim, relations = load_graphpred_dataset(
+        train_dataset, valid_dataset, feat_dim, relations = load_dataset(
             dataset_path, CV_FOLDS=CV_FOLDS, cv_select=cv_select, bidirected=bidirected
         )
 
@@ -241,7 +241,7 @@ all_recalls = []
 all_accuracies = []
 
 # 加载测试集并评估最优模型
-test_dataset, feat_dim, _ = load_graphpred_testDataset(dataset_path, bidirected=False)  # 加载测试集
+test_dataset, feat_dim, _ = load_testDataset(dataset_path, bidirected=False)  # 加载测试集
 for fold in range(CV_FOLDS):
     best_model_path = f'best_model_fold_{fold}.pt'
     auc, f1, precision, recall, accuracy = test_best_model(test_dataset, feat_dim, hidden_feats=hidden_feats, num_classes=1, model_path=best_model_path, batch_size=8)

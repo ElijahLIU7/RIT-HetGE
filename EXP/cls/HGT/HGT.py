@@ -10,7 +10,7 @@ import logging
 import os
 from dgl.data import DGLDataset
 import numpy as np
-from protein_wang.pyHGT.utils import load_graphpred_dataset, load_graphpred_testDataset
+from HGRIFN.utils import load_dataset, load_testDataset
 
 
 # 配置日志

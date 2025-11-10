@@ -9,13 +9,12 @@ from tqdm import tqdm
 from abc import ABCMeta
 from dgl.dataloading import GraphDataLoader
 from sklearn.metrics import roc_auc_score, f1_score, precision_score, recall_score, accuracy_score
-from protein_wang.pyHGT.utils import load_graphpred_dataset, load_graphpred_testDataset
+from HGRIFN.utils import load_dataset, load_testDataset
 from sklearn.manifold import TSNE
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# 配置日志
 logging.basicConfig(filename='training_log.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
@@ -370,7 +369,7 @@ def cross_validation_dhne(dataset_path, CV_FOLDS=10, epochs=50, lr=0.001, batch_
         print(f"Running fold {cv_select + 1}/{CV_FOLDS}...")
 
         # Load dataset and select train and validation sets for the current fold
-        train_dataset, valid_dataset, feat_dim, relations = load_graphpred_dataset(
+        train_dataset, valid_dataset, feat_dim, relations = load_dataset(
             dataset_path, CV_FOLDS=CV_FOLDS, cv_select=cv_select, is_classification=True
         )
 
@@ -425,7 +424,7 @@ if '__main__' == __name__:
     all_recalls = []
     all_accuracies = []
 
-    test_dataset = load_graphpred_testDataset(dataset_path, bidirected=False, is_classification=True)  # 加载测试集
+    test_dataset = load_testDataset(dataset_path, bidirected=False, is_classification=True)  # 加载测试集
     feat_dim = 572
     for fold in range(CV_FOLDS):
         # best_model_path = f'best_dhne_model_fold_{fold}.pt'
