@@ -1,6 +1,6 @@
 # Residue Interaction Type-Aware Heterogeneous Graph Embedding model (RIT-HetGE)
 
-![Architecture of the Heterogeneous Graph Protein Residue Interaction Fusion Network model (RIN-HetGE)](framework.png)
+![RIT-HetGE: A residue interaction type-aware heterogeneous graph embedding model for protein thermal stability prediction](framework.png)
 ## Overview
 
 In this project, we provide a specific implementation of RIN-HetGE in Pytorch. The organizational structure of this code repository is as follows:
@@ -45,5 +45,5 @@ python script/test_cls.py [--input] [--results] [--data] [--cuda]
 ```
 
 ## Cite
-
+Under Review.
 
