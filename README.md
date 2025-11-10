@@ -7,6 +7,16 @@ In this project, we provide a specific implementation of RIN-HetGE in Pytorch. T
 
 + ```EXP/``` stores all baseline algorithms for solving graph classification and regression problems, such as GCN.py (GCN code), DHNE.py (DHNE code) and so on.
 
+## Installation
+
+Install the latest version with:
+
+```bash
+git clone https://github.com/ElijahLIU7/RIT-HetGE.git
+cd RIT-HetGE
+pip install -r requirements.txt
+```
+
 ## Data preprocessing
 
 For the specific [HRIN-ProTstab](https://huggingface.co/datasets/ElijahL/HRIN-ProTstab) dataset download, please click on the URL. Place the downloaded dataset in path ```data/HRIN-ProTstab``` to complete the algorithm implementation.
