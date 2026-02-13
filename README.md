@@ -54,6 +54,17 @@ Run the test_cls.py file, which is the main script file used to ***test*** the s
 python script/test_cls.py [--input] [--results] [--data] [--cuda]
 ```
 
-## Cite
-Under Review.
-
+## Cite us
+```bibtex
+@article{LIU2026108707,
+  title = {RIT-HetGE: A residue interaction type-aware heterogeneous graph-embedding model for predicting protein thermal stability},
+  journal = {Neural Networks},
+  volume = {199},
+  pages = {108707},
+  year = {2026},
+  issn = {0893-6080},
+  doi = {https://doi.org/10.1016/j.neunet.2026.108707},
+  url = {https://www.sciencedirect.com/science/article/pii/S0893608026001693},
+  author = {Lingzhi Liu and Yingying Jiang and Yanbin Gu and Shiming Zhao and Yanrui Ding}
+}
+```
